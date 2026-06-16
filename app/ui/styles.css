@@ -25,6 +25,13 @@ footer {visibility: hidden;}
 [data-testid="stSidebarCollapseButton"] { display: none !important; }
 [data-testid="collapsedControl"]        { display: none !important; }
 
+/* 브라우저 캐시 무시, 사이드바 항상 열림 상태로 강제 */
+section[data-testid="stSidebar"] {
+    display: flex !important;
+    transform: none !important;
+    min-width: 244px !important;
+}
+
 .stApp {
     background-color: var(--primary-bg);
     color: var(--text-main);

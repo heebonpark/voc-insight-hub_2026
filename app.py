@@ -105,10 +105,14 @@ with st.sidebar:
                 pass
 
 # ── 사이드바 표시/숨김 CSS 적용 ───────────────────────────────────────────────
+# styles.css가 사이드바를 항상 열림으로 강제 → 닫을 때만 오버라이드
 if not st.session_state.sidebar_open:
     st.markdown("""
     <style>
-    section[data-testid="stSidebar"] { display: none !important; }
+    section[data-testid="stSidebar"] {
+        display: none !important;
+        min-width: 0 !important;
+    }
     .main .block-container { max-width: 100% !important; padding-left: 2rem !important; }
     </style>
     """, unsafe_allow_html=True)
