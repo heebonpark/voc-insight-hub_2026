@@ -707,8 +707,9 @@ with tab5:
         _s = scored_df.loc[:, ~scored_df.columns.duplicated(keep='first')]
         _seen: set = set()
         disp_cols = []
-        for c in ['_riskScore', '_emScore', '위험등급',
-                  '상태', 'VOC유형대', '접수일자', '_cStatusM', '_bizZone', text_col]:
+        _risk_base = ['_riskScore', '_emScore', '위험등급',
+                      '상태', 'VOC유형대', date_col, '_cStatusM', '_bizZone', text_col]
+        for c in _risk_base:
             if c in _s.columns and c not in _seen:
                 disp_cols.append(c)
                 _seen.add(c)
@@ -744,30 +745,41 @@ with tab6:
 # ── Tab 7: 데이터 & 내보내기 ──────────────────────────────────────────────────
 with tab7:
     st.markdown(f"#### 전체 데이터 — {len(df):,}건")
+    # VOC 원본에 '설치주소', '담당자' 컬럼이 이미 존재 → 시설 매칭 결과는 다른 이름으로
     col_rename = {
         '_matchType': '매칭유형', '_bizZone': '영업구역', '_techZone': '기술구역',
-        '_tel': '전화번호', '_cStatus': '계약상태(대)', '_cStatusM': '계약상태(중)',
+        '_tel': '시설전화번호', '_cStatus': '계약상태(대)', '_cStatusM': '계약상태(중)',
         '_sStatusM': '서비스상태', '_stopDate': '정지일', '_termDate': '해지일',
-        '_facAddr': '설치주소', '_mgr': '담당자', '_salesName': '영업사원',
+        '_facAddr': '시설주소', '_mgr': '시설담당자', '_salesName': '영업사원',
     }
     display_df = df.rename(columns=col_rename)
     if '매칭유형' in display_df.columns:
         display_df['매칭유형'] = display_df['매칭유형'].map(
             {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
-        )
+        ).fillna('미매칭')
 
-    # datetime 컬럼이 datetime 타입이면 문자열로 변환해 표시
+    # 중복 컬럼 제거 (혹시 남아있는 경우 대비)
+    display_df = display_df.loc[:, ~display_df.columns.duplicated(keep='first')]
+
+    # datetime 컬럼 문자열 정리 (단일 Series 대상만)
     _dt_hints = ('일자', '일시', '날짜', '개시일', '종료일')
     for _dc in display_df.columns:
-        if any(h in _dc for h in _dt_hints):
-            if pd.api.types.is_datetime64_any_dtype(display_df[_dc]):
-                display_df[_dc] = display_df[_dc].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+        if not any(h in _dc for h in _dt_hints):
+            continue
+        try:
+            _col_data = display_df[_dc]
+            if isinstance(_col_data, pd.DataFrame):
+                continue  # 중복 컬럼 잔존 시 건너뜀
+            if pd.api.types.is_datetime64_any_dtype(_col_data):
+                display_df[_dc] = _col_data.dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
             else:
                 display_df[_dc] = (
-                    display_df[_dc].astype(str)
+                    _col_data.astype(str)
                     .str.replace(r'\.0+$', '', regex=True)
                     .str.replace(r'^nan$', '', regex=True)
                 )
+        except Exception:
+            pass
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
@@ -781,5 +793,11 @@ with tab7:
     )
 
     search_q = st.text_input("🔍 내용 검색", placeholder="검색어를 입력하세요...")
-    view_df = display_df[display_df[text_col].str.contains(search_q, na=False)] if search_q else display_df
+    if search_q and text_col in display_df.columns:
+        _tc = display_df[text_col]
+        if isinstance(_tc, pd.DataFrame):
+            _tc = _tc.iloc[:, 0]
+        view_df = display_df[_tc.str.contains(search_q, na=False)]
+    else:
+        view_df = display_df
     st.dataframe(view_df, use_container_width=True)
