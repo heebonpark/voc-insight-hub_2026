@@ -21,10 +21,11 @@ footer {visibility: hidden;}
 [data-testid="stDecoration"] {display: none;}
 .stDeployButton {display: none !important;}
 
-/* 사이드바 토글 버튼 항상 표시 */
+/* 사이드바 닫기 버튼 숨김 (실수로 닫히는 것 방지) */
+[data-testid="stSidebarCollapseButton"],
+button[aria-label="Close sidebar"],
 [data-testid="collapsedControl"] {
-    visibility: visible !important;
-    display: flex !important;
+    display: none !important;
 }
 
 .stApp {
