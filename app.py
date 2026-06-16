@@ -117,6 +117,33 @@ def _build_sankey(df: pd.DataFrame, stage_cols: list, max_cat: int = 10) -> go.F
     return fig
 
 
+# ── 날짜/시간 컬럼 정규화 헬퍼 ────────────────────────────────────────────────
+def _clean_dt_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """날짜/시간 컬럼의 .0 접미사를 제거하고 시:분:초 포함 형식으로 통일.
+    접수일자(2025-12-31 10:51:58.0) → 2025-12-31 10:51:58
+    """
+    _dt_hints = ('일자', '일시', '날짜', '개시일', '종료일')
+    df = df.copy()
+    for col in df.columns:
+        if not any(h in col for h in _dt_hints):
+            continue
+        try:
+            raw = df[col].astype(str).str.strip().str.replace(r'\.0+$', '', regex=True)
+            parsed = pd.to_datetime(raw, errors='coerce')
+            if parsed.notna().sum() == 0:
+                continue
+            has_time = (
+                (parsed.dt.hour > 0).any() or
+                (parsed.dt.minute > 0).any() or
+                (parsed.dt.second > 0).any()
+            )
+            fmt = '%Y-%m-%d %H:%M:%S' if has_time else '%Y-%m-%d'
+            df[col] = parsed.dt.strftime(fmt).where(parsed.notna(), '')
+        except Exception:
+            pass
+    return df
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📊 VOC Insight Hub")
@@ -181,6 +208,7 @@ with st.sidebar:
                         voc_file, fac_file,
                         voc_sheet=voc_sheet, fac_sheet=fac_sheet,
                     )
+                    df_result = _clean_dt_cols(df_result)
                     st.session_state.matched_df = df_result
                     n_matched = (df_result['_matchType'] != '').sum()
                     st.success(f"✅ 매칭 완료! 총 {len(df_result):,}건 / 매칭 {n_matched:,}건")
@@ -190,6 +218,7 @@ with st.sidebar:
             with st.spinner("VOC 파일 로드 중..."):
                 try:
                     df_result = load_voc_only(voc_file, sheet_name=voc_sheet)
+                    df_result = _clean_dt_cols(df_result)
                     st.session_state.matched_df = df_result
                     st.info(f"📄 VOC 파일만 로드됨 ({len(df_result):,}건) — 텍스트 분석만 가능합니다.")
                 except Exception as e:
@@ -310,9 +339,9 @@ if sel_vtype != '전체' and vtype_col and vtype_col in df.columns:
 
 if date_range and date_col and len(date_range) == 2:
     try:
-        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-        df = df[(df[date_col].dt.date >= date_range[0]) &
-                (df[date_col].dt.date <= date_range[1])]
+        _dt_filter = pd.to_datetime(df[date_col], errors='coerce')
+        df = df[(_dt_filter.dt.date >= date_range[0]) &
+                (_dt_filter.dt.date <= date_range[1])]
     except Exception:
         pass
 
@@ -385,9 +414,11 @@ with ch1:
         st.info("영업구역 정보가 없습니다.")
 
 with ch2:
-    st.markdown("#### 일별 VOC 추이 (이상 탐지)")
     if date_col:
         adf = cached_anomalies(df.to_json(), date_col)
+        gran = adf['_gran'].iloc[0] if (not adf.empty and '_gran' in adf.columns) else 'daily'
+        chart_title = '시간별 VOC 추이 (이상 탐지)' if gran == 'hourly' else '일별 VOC 추이 (이상 탐지)'
+        st.markdown(f"#### {chart_title}")
         if not adf.empty:
             norm = adf[~adf['is_anomaly']]
             anom = adf[adf['is_anomaly']]
@@ -396,11 +427,16 @@ with ch2:
                                       name='정상', line=dict(color='#2563eb')))
             fig2.add_trace(go.Scatter(x=anom[date_col], y=anom['count'], mode='markers',
                                       name='이상 급증', marker=dict(color='red', size=12, symbol='star')))
-            fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                               font=dict(color='white'), margin=dict(t=10),
-                               legend=dict(bgcolor='rgba(0,0,0,0)'))
+            fig2.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'), margin=dict(t=30),
+                legend=dict(bgcolor='rgba(0,0,0,0)'),
+                xaxis_title='시간' if gran == 'hourly' else '날짜',
+                yaxis_title='건수',
+            )
             st.plotly_chart(fig2, use_container_width=True)
     else:
+        st.markdown("#### VOC 추이 (이상 탐지)")
         st.info("날짜 컬럼(접수일자)을 찾을 수 없습니다.")
 
 _mlabels = {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
@@ -421,7 +457,23 @@ if not text_col:
     st.warning("분석할 텍스트 컬럼('등록내용', '내용' 등)을 찾을 수 없습니다.")
     st.stop()
 
-st.info(f"분석 대상 컬럼: **{text_col}**")
+with st.expander("📋 컬럼 인식 현황", expanded=False):
+    _col_info = {
+        '텍스트 분석': (text_col, f'`{text_col}`'),
+        '접수 날짜/시간': (date_col, f'`{date_col}`'),
+        'VOC 유형': (vtype_cur, f'`{vtype_cur}`'),
+        '처리 상태': (state_col_cur, f'`{state_col_cur}`'),
+    }
+    for _k, (_col, _label) in _col_info.items():
+        _icon = '✅' if _col else '❌'
+        _display = _label if _col else '미인식'
+        st.write(f"{_icon} **{_k}**: {_display}")
+    if date_col and date_col in df.columns:
+        _dt_samples = df[date_col].replace('', pd.NA).dropna().head(3).tolist()
+        if _dt_samples:
+            st.caption(f"접수일시 샘플: {' | '.join(str(d) for d in _dt_samples)}")
+    st.caption(f"전체 컬럼 수: {len(df.columns)}개 — VOC 총 {len(df):,}건")
+
 all_texts  = df[text_col].dropna().astype(str).tolist()
 valid_texts = [t for t in all_texts if t.strip() and t != 'nan']
 
@@ -695,6 +747,19 @@ with tab7:
         display_df['매칭유형'] = display_df['매칭유형'].map(
             {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
         )
+
+    # datetime 컬럼이 datetime 타입이면 문자열로 변환해 표시
+    _dt_hints = ('일자', '일시', '날짜', '개시일', '종료일')
+    for _dc in display_df.columns:
+        if any(h in _dc for h in _dt_hints):
+            if pd.api.types.is_datetime64_any_dtype(display_df[_dc]):
+                display_df[_dc] = display_df[_dc].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+            else:
+                display_df[_dc] = (
+                    display_df[_dc].astype(str)
+                    .str.replace(r'\.0+$', '', regex=True)
+                    .str.replace(r'^nan$', '', regex=True)
+                )
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:

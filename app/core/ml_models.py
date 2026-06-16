@@ -117,29 +117,52 @@ def cluster_vocs(texts: list, n_clusters: int = 4) -> list[str]:
 
 
 def detect_anomalies(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
-    """IQR + Isolation Forest 이중 이상 탐지"""
+    """IQR + Isolation Forest 이중 이상 탐지
+    - 단일 날짜 데이터: 시간별(hourly) 집계
+    - 복수 날짜 데이터: 일별(daily) 집계
+    반환 DataFrame에 _gran 컬럼('hourly'|'daily') 포함.
+    """
     if date_col not in df.columns:
         return pd.DataFrame()
     try:
         tmp = df.copy()
         tmp[date_col] = pd.to_datetime(tmp[date_col], errors='coerce')
-        daily = tmp.groupby(tmp[date_col].dt.date).size().reset_index(name='count')
-        daily = daily.dropna()
-        daily[date_col] = pd.to_datetime(daily[date_col])
+        tmp = tmp.dropna(subset=[date_col])
+        if tmp.empty:
+            return pd.DataFrame()
 
-        if len(daily) < 5:
-            daily['is_anomaly'] = False
-            return daily
+        n_days = tmp[date_col].dt.date.nunique()
 
-        q1, q3 = daily['count'].quantile([0.25, 0.75])
+        if n_days <= 1:
+            # 당일 데이터 → 시간별 집계
+            tmp['_grp'] = tmp[date_col].dt.floor('h')
+            gran = 'hourly'
+        else:
+            # 복수 날짜 → 일별 집계 (날짜 자정으로 정규화)
+            tmp['_grp'] = tmp[date_col].dt.normalize()
+            gran = 'daily'
+
+        grouped = tmp.groupby('_grp').size().reset_index(name='count')
+        grouped = grouped.rename(columns={'_grp': date_col})
+        grouped['_gran'] = gran
+
+        if len(grouped) < 3:
+            grouped['is_anomaly'] = False
+            return grouped
+
+        q1, q3 = grouped['count'].quantile([0.25, 0.75])
         iqr_upper = q3 + 1.5 * (q3 - q1)
-        iqr_flag = daily['count'] > iqr_upper
+        iqr_flag = grouped['count'] > iqr_upper
 
-        iso = IsolationForest(contamination=0.1, random_state=42)
-        iso_flag = iso.fit_predict(daily[['count']]) == -1
+        if len(grouped) >= 5:
+            contamination = min(0.1, max(0.02, 1.5 / len(grouped)))
+            iso = IsolationForest(contamination=contamination, random_state=42)
+            iso_flag = iso.fit_predict(grouped[['count']]) == -1
+        else:
+            iso_flag = [False] * len(grouped)
 
-        daily['is_anomaly'] = iqr_flag | iso_flag
-        return daily
+        grouped['is_anomaly'] = iqr_flag | iso_flag
+        return grouped
     except Exception:
         return pd.DataFrame()
 
