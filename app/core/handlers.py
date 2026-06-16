@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import re
 from typing import Optional
@@ -77,25 +78,63 @@ def _norm_name(val: str) -> str:
     return val.lower()
 
 
-def _load_file(file) -> pd.DataFrame:
-    name = getattr(file, 'name', '').lower()
+def get_excel_sheets(file) -> list:
+    """Excel 파일의 시트 이름 목록 반환. CSV면 빈 리스트."""
+    name = os.path.basename(file).lower() if isinstance(file, str) else getattr(file, 'name', '').lower()
+    if not name.endswith(('.xlsx', '.xls')):
+        return []
+    try:
+        xl = pd.ExcelFile(file)
+        sheets = xl.sheet_names
+        if hasattr(file, 'seek'):
+            file.seek(0)
+        return sheets
+    except Exception:
+        if hasattr(file, 'seek'):
+            file.seek(0)
+        return []
+
+
+def _load_file(file, sheet_name=0) -> pd.DataFrame:
+    """파일 로드.
+    file: Streamlit 업로드 객체 또는 로컬 경로 문자열
+    sheet_name: Excel 시트 이름/인덱스 (CSV는 무시)
+    """
+    if isinstance(file, str):
+        name = os.path.basename(file).lower()
+    else:
+        name = getattr(file, 'name', '').lower()
+
     if name.endswith(('.xlsx', '.xls')):
-        return pd.read_excel(file, dtype=str)
+        return pd.read_excel(file, sheet_name=sheet_name, dtype=str)
+
+    # CSV: 경로 문자열이면 인코딩 직접 감지
+    if isinstance(file, str):
+        with open(file, 'rb') as fh:
+            raw = fh.read(8192)
+        for enc in ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']:
+            try:
+                raw.decode(enc)
+                return pd.read_csv(file, encoding=enc, dtype=str)
+            except UnicodeDecodeError:
+                continue
+        return pd.read_csv(file, encoding='cp949', dtype=str)
+
     enc = _detect_encoding(file)
     return pd.read_csv(file, encoding=enc, dtype=str)
 
 
-def load_voc_only(voc_file) -> pd.DataFrame:
+def load_voc_only(voc_file, sheet_name=0) -> pd.DataFrame:
     """시설 파일 없이 VOC 파일만 로드 (시설 컬럼은 빈 값으로 초기화)"""
-    df = _load_file(voc_file).fillna('')
+    df = _load_file(voc_file, sheet_name=sheet_name).fillna('')
     for col in _OUTPUT_COLS:
         df[col] = ''
     return df
 
 
-def load_and_preprocess_data(voc_file, fac_file) -> pd.DataFrame:
-    df_voc = _load_file(voc_file).fillna('')
-    df_fac = _load_file(fac_file).fillna('')
+def load_and_preprocess_data(voc_file, fac_file, voc_sheet=0, fac_sheet=0) -> pd.DataFrame:
+    df_voc = _load_file(voc_file, sheet_name=voc_sheet).fillna('')
+    df_fac = _load_file(fac_file, sheet_name=fac_sheet).fillna('')
 
     # 3가지 숫자 키 컬럼 감지 및 정규화
     norm_keys = {'서비스번호': 'Norm_Svc', '계약번호': 'Norm_Cno', '고객번호': 'Norm_Cust'}
