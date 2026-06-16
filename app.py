@@ -23,6 +23,8 @@ load_css()
 for _k in ['matched_df', 'sentiment_model']:
     if _k not in st.session_state:
         st.session_state[_k] = None
+if 'sidebar_open' not in st.session_state:
+    st.session_state.sidebar_open = True
 
 # ── 캐시 래퍼 ────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
@@ -102,8 +104,24 @@ with st.sidebar:
             except Exception:
                 pass
 
+# ── 사이드바 표시/숨김 CSS 적용 ───────────────────────────────────────────────
+if not st.session_state.sidebar_open:
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"] { display: none !important; }
+    .main .block-container { max-width: 100% !important; padding-left: 2rem !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
 # ── Main ─────────────────────────────────────────────────────────────────────
-st.title("📊 VOC Insight Hub")
+btn_col, title_col = st.columns([0.04, 0.96])
+with btn_col:
+    icon = "✕" if st.session_state.sidebar_open else "☰"
+    if st.button(icon, key="toggle_sidebar", help="사이드바 접기/펼치기"):
+        st.session_state.sidebar_open = not st.session_state.sidebar_open
+        st.rerun()
+with title_col:
+    st.title("📊 VOC Insight Hub")
 
 if st.session_state.matched_df is None:
     st.info("👈 좌측 사이드바에서 파일을 업로드하고 **데이터 분석 실행**을 눌러주세요.")

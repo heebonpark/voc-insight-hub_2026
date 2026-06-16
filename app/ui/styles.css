@@ -21,12 +21,9 @@ footer {visibility: hidden;}
 [data-testid="stDecoration"] {display: none;}
 .stDeployButton {display: none !important;}
 
-/* 사이드바 닫기 버튼 숨김 (실수로 닫히는 것 방지) */
-[data-testid="stSidebarCollapseButton"],
-button[aria-label="Close sidebar"],
-[data-testid="collapsedControl"] {
-    display: none !important;
-}
+/* 네이티브 사이드바 토글 버튼 숨김 (커스텀 버튼으로 대체) */
+[data-testid="stSidebarCollapseButton"] { display: none !important; }
+[data-testid="collapsedControl"]        { display: none !important; }
 
 .stApp {
     background-color: var(--primary-bg);
