@@ -10,6 +10,7 @@ from app.core.ml_models import (
     extract_keywords, extract_topics_lda, cluster_vocs,
     detect_anomalies, analyze_sentiment_rule,
     load_sentiment_model, analyze_sentiment,
+    add_scores_to_df,
 )
 
 st.set_page_config(
@@ -47,6 +48,10 @@ def cached_sentiment_rule(texts_tuple):
 def cached_anomalies(df_json, date_col):
     return detect_anomalies(pd.read_json(io.StringIO(df_json)), date_col)
 
+@st.cache_data(show_spinner=False)
+def cached_scores(df_json, text_col):
+    return add_scores_to_df(pd.read_json(io.StringIO(df_json)), text_col)
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📊 VOC Insight Hub")
@@ -63,7 +68,8 @@ with st.sidebar:
                 try:
                     df_result = load_and_preprocess_data(voc_file, fac_file)
                     st.session_state.matched_df = df_result
-                    st.success(f"✅ 매칭 완료! 총 {len(df_result):,}건")
+                    n_matched = (df_result['_matchType'] != '').sum()
+                    st.success(f"✅ 매칭 완료! 총 {len(df_result):,}건 / 매칭 {n_matched:,}건")
                 except Exception as e:
                     st.error(f"❌ {e}")
         else:
@@ -71,7 +77,7 @@ with st.sidebar:
                 try:
                     df_result = load_voc_only(voc_file)
                     st.session_state.matched_df = df_result
-                    st.info(f"📄 VOC 파일만 로드됨 ({len(df_result):,}건) — 시설 파일 없이 텍스트 분석만 가능합니다.")
+                    st.info(f"📄 VOC 파일만 로드됨 ({len(df_result):,}건) — 텍스트 분석만 가능합니다.")
                 except Exception as e:
                     st.error(f"❌ {e}")
 
@@ -80,14 +86,39 @@ with st.sidebar:
         st.markdown("#### 🔎 필터")
         _df_all = st.session_state.matched_df
 
-        zones = ['전체'] + sorted(
-            _df_all.loc[_df_all['_bizZone'] != '', '_bizZone'].unique().tolist()
-        ) if '_bizZone' in _df_all.columns else ['전체']
+        zones = ['전체']
+        if '_bizZone' in _df_all.columns:
+            zones += sorted(_df_all.loc[_df_all['_bizZone'] != '', '_bizZone'].unique().tolist())
         sel_zone = st.selectbox("영업구역", zones)
 
-        match_opts = {'전체': None, '서비스번호 매칭': 'svc',
-                      '계약번호 매칭': 'cno', '고객번호 매칭': 'cust', '미매칭': ''}
-        sel_match = st.selectbox("매칭 유형", list(match_opts.keys()))
+        # 4단계 매칭 + 정지/해지 시설 필터
+        match_opts = {
+            '전체':        None,
+            '서비스번호 매칭': 'svc',
+            '계약번호 매칭':  'cno',
+            '고객번호 매칭':  'cust',
+            '상호명 매칭':   'name',
+            '미매칭':       '',
+            '🔶 정지 시설':  'stop',
+            '🔴 해지 시설':  'term',
+        }
+        sel_match = st.selectbox("매칭/계약 유형", list(match_opts.keys()))
+
+        # VOC 상태 필터
+        state_col = next((c for c in _df_all.columns if c in ('상태', '처리상태', 'status')), None)
+        if state_col:
+            states = ['전체'] + sorted(_df_all[state_col].dropna().unique().tolist())
+            sel_state = st.selectbox("처리 상태", states)
+        else:
+            sel_state = '전체'
+
+        # VOC 유형 필터
+        vtype_col = next((c for c in _df_all.columns if 'VOC유형대' in c or c == 'VOC유형'), None)
+        if vtype_col:
+            vtypes = ['전체'] + sorted(_df_all[vtype_col].dropna().unique().tolist())
+            sel_vtype = st.selectbox("VOC 유형", vtypes)
+        else:
+            sel_vtype = '전체'
 
         date_col = next((c for c in _df_all.columns if '접수일' in c), None)
         date_range = None
@@ -104,8 +135,7 @@ with st.sidebar:
             except Exception:
                 pass
 
-# ── 사이드바 표시/숨김 CSS 적용 ───────────────────────────────────────────────
-# styles.css가 사이드바를 항상 열림으로 강제 → 닫을 때만 오버라이드
+# ── 사이드바 표시/숨김 CSS ─────────────────────────────────────────────────────
 if not st.session_state.sidebar_open:
     st.markdown("""
     <style>
@@ -117,7 +147,7 @@ if not st.session_state.sidebar_open:
     </style>
     """, unsafe_allow_html=True)
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+# ── 헤더 ──────────────────────────────────────────────────────────────────────
 btn_col, title_col = st.columns([0.04, 0.96])
 with btn_col:
     icon = "✕" if st.session_state.sidebar_open else "☰"
@@ -130,11 +160,12 @@ with title_col:
 if st.session_state.matched_df is None:
     st.info("👈 좌측 사이드바에서 파일을 업로드하고 **데이터 분석 실행**을 눌러주세요.")
     st.markdown("""
-    **지원 기능 요약**
+    **지원 기능**
     | 기능 | 설명 |
     |---|---|
     | 📁 파일 | CSV·Excel 자동 인코딩 감지 |
-    | 🔗 매칭 | 서비스번호→계약번호→고객번호 3단계 자동 매칭 |
+    | 🔗 매칭 | 서비스번호→계약번호→고객번호→**상호명** 4단계 자동 매칭 |
+    | ⚠️ 리스크 | HTML v3 calcRisk 이식 — 감성·정지·해지·청구 복합 점수 |
     | 🔑 키워드 | 한국어 형태소 분석 + TF-IDF |
     | 📚 토픽 | LDA 토픽 모델링 |
     | 🎭 감성 | 규칙 기반 / 딥러닝 감성 분석 |
@@ -152,7 +183,25 @@ if sel_zone != '전체' and '_bizZone' in df.columns:
 
 mval = match_opts.get(sel_match)
 if mval is not None:
-    df = df[df['_matchType'] == mval]
+    if mval == 'stop':
+        if '_cStatusM' in df.columns:
+            df = df[df['_cStatusM'] == '일시정지']
+        else:
+            df = df.iloc[0:0]
+    elif mval == 'term':
+        TERM_STATUS = {'일반해지', '명의해지', '직권해지', '해지'}
+        if '_cStatusM' in df.columns:
+            df = df[df['_cStatusM'].isin(TERM_STATUS)]
+        else:
+            df = df.iloc[0:0]
+    else:
+        df = df[df['_matchType'] == mval]
+
+if sel_state != '전체' and state_col and state_col in df.columns:
+    df = df[df[state_col] == sel_state]
+
+if sel_vtype != '전체' and vtype_col and vtype_col in df.columns:
+    df = df[df[vtype_col] == sel_vtype]
 
 if date_range and date_col and len(date_range) == 2:
     try:
@@ -166,32 +215,55 @@ if df.empty:
     st.warning("선택한 필터 조건에 해당하는 데이터가 없습니다.")
     st.stop()
 
-# ── KPI ───────────────────────────────────────────────────────────────────────
+# ── KPI 8개 ───────────────────────────────────────────────────────────────────
 st.markdown("### 📈 핵심 지표")
 total   = len(df)
 matched = (df['_matchType'] != '').sum()
-unmatch = total - matched
 rate    = matched / total * 100 if total else 0
 
-top_zone = '-'
-if '_bizZone' in df.columns:
-    vc = df[df['_bizZone'] != '']['_bizZone'].value_counts()
-    top_zone = vc.index[0] if not vc.empty else '-'
+# 미접수
+state_col_cur = next((c for c in df.columns if c in ('상태', '처리상태')), None)
+unprocessed = int((df[state_col_cur] == '미접수').sum()) if state_col_cur else 0
 
+# 정지·해지 시설 VOC
+stop_count = int((df['_cStatusM'] == '일시정지').sum()) if '_cStatusM' in df.columns else 0
+TERM_SET = {'일반해지', '명의해지', '직권해지', '해지'}
+term_count = int(df['_cStatusM'].isin(TERM_SET).sum()) if '_cStatusM' in df.columns else 0
+
+# 청구·이의 민원
+vtype_cur = next((c for c in df.columns if 'VOC유형대' in c), None)
+billing = int((df[vtype_cur] == '청구 미/이의').sum()) if vtype_cur else 0
+
+# 감성·긴급 VOC (등록내용 기준)
+text_col = next(
+    (c for c in df.columns if any(k in c for k in ['등록내용', '내용', '상담', 'VOC', '불만', '접수내용'])),
+    None,
+)
+urgent = 0
+if text_col:
+    urgent = int(df[text_col].fillna('').str.contains('감성|불만|빠른연락|긴급').sum())
+
+# 일 평균
 avg_day = '-'
-if date_col and date_col in df.columns:
+date_col = next((c for c in df.columns if '접수일' in c), None)
+if date_col:
     try:
-        n_days = df[date_col].dt.date.nunique()
+        _ts = pd.to_datetime(df[date_col], errors='coerce')
+        n_days = _ts.dt.date.nunique()
         avg_day = f"{total / n_days:.1f}건" if n_days else '-'
     except Exception:
         pass
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
+c5, c6, c7, c8 = st.columns(4)
 with c1: render_metric("총 VOC 건수",    f"{total:,}건")
 with c2: render_metric("시설 매칭률",    f"{rate:.1f}%")
-with c3: render_metric("미매칭 건수",    f"{unmatch:,}건")
-with c4: render_metric("최다 발생 구역", top_zone)
-with c5: render_metric("일 평균 접수",   avg_day)
+with c3: render_metric("미접수 건수",    f"{unprocessed:,}건")
+with c4: render_metric("정지 시설 VOC",  f"{stop_count:,}건")
+with c5: render_metric("해지 시설 VOC",  f"{term_count:,}건")
+with c6: render_metric("청구·이의 민원", f"{billing:,}건")
+with c7: render_metric("감성·긴급 VOC",  f"{urgent:,}건")
+with c8: render_metric("일 평균 접수",   avg_day)
 
 # ── 현황 차트 ─────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -210,19 +282,20 @@ with ch1:
                               paper_bgcolor='rgba(0,0,0,0)',
                               font=dict(color='white'), margin=dict(t=10))
             st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("영업구역 정보가 없습니다.")
 
 with ch2:
     st.markdown("#### 일별 VOC 추이 (이상 탐지)")
-    dc = next((c for c in df.columns if '접수일' in c), None)
-    if dc:
-        adf = cached_anomalies(df.to_json(), dc)
+    if date_col:
+        adf = cached_anomalies(df.to_json(), date_col)
         if not adf.empty:
             fig2 = go.Figure()
             norm = adf[~adf['is_anomaly']]
             anom = adf[adf['is_anomaly']]
-            fig2.add_trace(go.Scatter(x=norm[dc], y=norm['count'], mode='lines+markers',
+            fig2.add_trace(go.Scatter(x=norm[date_col], y=norm['count'], mode='lines+markers',
                                       name='정상', line=dict(color='#2563eb')))
-            fig2.add_trace(go.Scatter(x=anom[dc], y=anom['count'], mode='markers',
+            fig2.add_trace(go.Scatter(x=anom[date_col], y=anom['count'], mode='markers',
                                       name='이상 급증',
                                       marker=dict(color='red', size=12, symbol='star')))
             fig2.update_layout(plot_bgcolor='rgba(0,0,0,0)',
@@ -235,11 +308,11 @@ with ch2:
 
 # 매칭 유형 분포
 st.markdown("#### 매칭 유형 분포")
-mlabels = {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', '': '미매칭'}
-md = df['_matchType'].map(mlabels).value_counts().reset_index()
+_mlabels = {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
+md = df['_matchType'].map(_mlabels).value_counts().reset_index()
 md.columns = ['유형', '건수']
-fig3 = px.bar(md, x='유형', y='건수', color='유형',
-              color_discrete_sequence=['#2563eb', '#16a34a', '#d97706', '#dc2626'])
+_colors = ['#2563eb', '#16a34a', '#d97706', '#7c3aed', '#dc2626']
+fig3 = px.bar(md, x='유형', y='건수', color='유형', color_discrete_sequence=_colors)
 fig3.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
                    font=dict(color='white'), showlegend=False, margin=dict(t=10))
 st.plotly_chart(fig3, use_container_width=True)
@@ -248,20 +321,16 @@ st.plotly_chart(fig3, use_container_width=True)
 st.markdown("---")
 st.markdown("### 🤖 AI 텍스트 분석")
 
-text_col = next(
-    (c for c in df.columns if any(k in c for k in ['내용', '상담', 'VOC', '불만', '접수내용'])),
-    None,
-)
 if not text_col:
-    st.warning("분석할 텍스트 컬럼('내용', '상담내용' 등)을 찾을 수 없습니다.")
+    st.warning("분석할 텍스트 컬럼('등록내용', '내용' 등)을 찾을 수 없습니다.")
     st.stop()
 
 st.info(f"분석 대상 컬럼: **{text_col}**")
 all_texts = df[text_col].dropna().astype(str).tolist()
 valid_texts = [t for t in all_texts if t.strip() and t != 'nan']
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["🔑 키워드", "📚 토픽 모델링", "🎭 감성 분석", "🗂️ 군집화", "📋 데이터 & 내보내기"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["🔑 키워드", "📚 토픽 모델링", "🎭 감성 분석", "⚠️ 리스크 분석", "🗂️ 군집화", "📋 데이터 & 내보내기"]
 )
 
 # ── Tab 1: 키워드 ─────────────────────────────────────────────────────────────
@@ -364,8 +433,70 @@ with tab3:
             else:
                 st.error("모델 로드에 실패했습니다.")
 
-# ── Tab 4: 군집화 ─────────────────────────────────────────────────────────────
+# ── Tab 4: 리스크 분석 ────────────────────────────────────────────────────────
 with tab4:
+    st.markdown("#### ⚠️ VOC 리스크 스코어링")
+    st.caption("감성 키워드·미접수·청구민원·해지/정지 시설 복합 점수 (0~30점)")
+
+    with st.spinner("리스크 점수 계산 중..."):
+        scored_df = cached_scores(df.to_json(), text_col)
+
+    if '_riskScore' in scored_df.columns and scored_df['_riskScore'].max() > 0:
+        # 위험도 등급 분류
+        def _grade(s):
+            if s >= 20: return '🔴 위험'
+            if s >= 12: return '🟠 주의'
+            if s >= 6:  return '🟡 관찰'
+            return '🟢 정상'
+
+        scored_df['위험등급'] = scored_df['_riskScore'].apply(_grade)
+
+        grade_cnt = scored_df['위험등급'].value_counts().reset_index()
+        grade_cnt.columns = ['등급', '건수']
+
+        r1, r2 = st.columns(2)
+        with r1:
+            grade_colors = {
+                '🔴 위험': '#dc2626', '🟠 주의': '#f97316',
+                '🟡 관찰': '#eab308', '🟢 정상': '#16a34a',
+            }
+            fig_grade = px.bar(grade_cnt, x='등급', y='건수', color='등급',
+                               color_discrete_map=grade_colors)
+            fig_grade.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'), showlegend=False, margin=dict(t=10),
+                title='위험도 등급 분포',
+            )
+            st.plotly_chart(fig_grade, use_container_width=True)
+
+        with r2:
+            fig_hist = px.histogram(scored_df, x='_riskScore', nbins=20,
+                                    color_discrete_sequence=['#2563eb'],
+                                    title='리스크 점수 분포')
+            fig_hist.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white'), margin=dict(t=40),
+                xaxis_title='리스크 점수', yaxis_title='건수',
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+        st.markdown("#### 🔺 고위험 VOC TOP 20")
+        # 표시할 컬럼 선택
+        disp_cols = ['_riskScore', '_emScore', '위험등급']
+        for c in ['상태', 'VOC유형대', '접수일자', '_cStatusM', '_bizZone', text_col]:
+            if c in scored_df.columns:
+                disp_cols.append(c)
+
+        top20 = scored_df.nlargest(20, '_riskScore')[disp_cols].reset_index(drop=True)
+        top20.columns = [c.replace('_riskScore', '리스크점수').replace('_emScore', '감성점수')
+                         .replace('_cStatusM', '계약상태').replace('_bizZone', '영업구역')
+                         .replace(text_col, 'VOC내용') for c in top20.columns]
+        st.dataframe(top20, use_container_width=True)
+    else:
+        st.info("리스크 점수를 계산할 수 있는 컬럼이 부족합니다. 시설 파일을 함께 업로드하면 정확도가 향상됩니다.")
+
+# ── Tab 5: 군집화 ─────────────────────────────────────────────────────────────
+with tab5:
     st.markdown("#### 불만 유형 군집화 (K-Means)")
     n_cl = st.slider("군집 수", 2, 8, 4, key="km_n")
     sample_size = min(300, len(valid_texts))
@@ -385,13 +516,28 @@ with tab4:
     st.plotly_chart(fig_cl, use_container_width=True)
     st.dataframe(cl_df, use_container_width=True)
 
-# ── Tab 5: 데이터 & 내보내기 ──────────────────────────────────────────────────
-with tab5:
+# ── Tab 6: 데이터 & 내보내기 ──────────────────────────────────────────────────
+with tab6:
     st.markdown(f"#### 전체 데이터 — {len(df):,}건")
+
+    # 컬럼 표시명 매핑 (내부 컬럼 → 한국어)
+    col_rename = {
+        '_matchType': '매칭유형', '_bizZone': '영업구역', '_techZone': '기술구역',
+        '_tel': '전화번호', '_cStatus': '계약상태(대)', '_cStatusM': '계약상태(중)',
+        '_sStatusM': '서비스상태', '_stopDate': '정지일', '_termDate': '해지일',
+        '_facAddr': '설치주소', '_mgr': '담당자', '_salesName': '영업사원',
+    }
+    display_df = df.rename(columns=col_rename)
+
+    # 매칭유형 코드 → 한국어
+    if '매칭유형' in display_df.columns:
+        display_df['매칭유형'] = display_df['매칭유형'].map(
+            {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
+        )
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='VOC분석결과')
+        display_df.to_excel(writer, index=False, sheet_name='VOC분석결과')
     buf.seek(0)
     st.download_button(
         label="📥 Excel 다운로드",
@@ -401,5 +547,5 @@ with tab5:
     )
 
     search_q = st.text_input("🔍 내용 검색", placeholder="검색어를 입력하세요...")
-    view_df = df[df[text_col].str.contains(search_q, na=False)] if search_q else df
+    view_df = display_df[display_df[text_col].str.contains(search_q, na=False)] if search_q else display_df
     st.dataframe(view_df, use_container_width=True)

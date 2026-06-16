@@ -186,3 +186,71 @@ def analyze_sentiment(texts: list, model) -> list[str]:
         return [mapping.get(o['label'], '중립') for o in outputs]
     except Exception:
         return ['오류'] * len(texts)
+
+
+import re as _re
+
+# 리스크·긴급도 판단용 패턴
+_RISK_EMOTION = _re.compile(r'감성|불만|해지|항의')
+_RISK_URGENT  = _re.compile(r'빠른연락|빠른|긴급|즉시|지금당장')
+_EM_HIGH      = _re.compile(r'감성불만|감성')
+_EM_MED       = _re.compile(r'불만|항의')
+_EM_CHURN     = _re.compile(r'해지|미연락|미방문')
+_EM_URGENT    = _re.compile(r'긴급|비일|즉시')
+
+_TERM_STATUS  = {'일반해지', '명의해지', '직권해지', '해지'}
+
+
+def compute_em_score(text: str) -> int:
+    """감성/긴급도 점수 (0–10). HTML v3의 emScore() 이식"""
+    if not isinstance(text, str):
+        return 0
+    score = 0
+    if _EM_HIGH.search(text):
+        score += 4
+    elif _EM_MED.search(text):
+        score += 2
+    if _RISK_URGENT.search(text):
+        score += 2
+    if _EM_CHURN.search(text):
+        score += 2
+    if _EM_URGENT.search(text):
+        score += 1
+    return min(score, 10)
+
+
+def compute_risk_score(row: dict) -> int:
+    """VOC 리스크 점수 (0–30). HTML v3의 calcRisk() 이식"""
+    score = 0
+    text = str(row.get('등록내용', '') or '')
+
+    if _RISK_EMOTION.search(text):
+        score += 6
+    if _RISK_URGENT.search(text):
+        score += 3
+
+    if row.get('상태') == '미접수':
+        score += 4
+    vtype = str(row.get('VOC유형대', '') or '')
+    if vtype == '청구 미/이의':
+        score += 5
+    elif vtype == '해지':
+        score += 4
+    if str(row.get('접수횟수', '0') or '0') == '1':
+        score += 4
+
+    cstatus = str(row.get('_cStatusM', '') or '')
+    if cstatus == '일시정지':
+        score += 2
+    elif cstatus in _TERM_STATUS:
+        score += 6
+
+    return min(score, 30)
+
+
+def add_scores_to_df(df: pd.DataFrame, text_col: str) -> pd.DataFrame:
+    """감성 점수·리스크 점수를 DataFrame에 컬럼으로 추가"""
+    df = df.copy()
+    df['_emScore']   = df[text_col].apply(compute_em_score) if text_col in df.columns else 0
+    df['_riskScore'] = df.apply(lambda r: compute_risk_score(r.to_dict()), axis=1)
+    return df
