@@ -19,6 +19,12 @@ html, body, [class*="css"]  {
 header {visibility: hidden;}
 footer {visibility: hidden;}
 
+/* 사이드바 토글 버튼은 항상 표시 */
+[data-testid="collapsedControl"] {
+    visibility: visible !important;
+    display: flex !important;
+}
+
 .stApp {
     background-color: var(--primary-bg);
     color: var(--text-main);
