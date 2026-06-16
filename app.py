@@ -705,12 +705,14 @@ with tab5:
         st.markdown("#### 🔺 고위험 VOC TOP 20")
         disp_cols = ['_riskScore', '_emScore', '위험등급']
         for c in ['상태', 'VOC유형대', '접수일자', '_cStatusM', '_bizZone', text_col]:
-            if c in scored_df.columns:
+            if c in scored_df.columns and c not in disp_cols:
                 disp_cols.append(c)
         top20 = scored_df.nlargest(20, '_riskScore')[disp_cols].reset_index(drop=True)
-        top20.columns = [c.replace('_riskScore', '리스크점수').replace('_emScore', '감성점수')
-                         .replace('_cStatusM', '계약상태').replace('_bizZone', '영업구역')
-                         .replace(text_col, 'VOC내용') for c in top20.columns]
+        top20 = top20.rename(columns={
+            '_riskScore': '리스크점수', '_emScore': '감성점수',
+            '_cStatusM': '계약상태', '_bizZone': '영업구역',
+            text_col: 'VOC내용',
+        })
         st.dataframe(top20, use_container_width=True)
     else:
         st.info("리스크 점수 계산 가능 컬럼이 부족합니다. 시설 파일을 함께 업로드하면 정확도가 향상됩니다.")
