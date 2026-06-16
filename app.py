@@ -703,11 +703,17 @@ with tab5:
             st.plotly_chart(fig_hist, use_container_width=True)
 
         st.markdown("#### 🔺 고위험 VOC TOP 20")
-        disp_cols = ['_riskScore', '_emScore', '위험등급']
-        for c in ['상태', 'VOC유형대', '접수일자', '_cStatusM', '_bizZone', text_col]:
-            if c in scored_df.columns and c not in disp_cols:
+        # scored_df 자체의 중복 컬럼 제거 (JSON 왕복 등으로 발생 가능)
+        _s = scored_df.loc[:, ~scored_df.columns.duplicated(keep='first')]
+        _seen: set = set()
+        disp_cols = []
+        for c in ['_riskScore', '_emScore', '위험등급',
+                  '상태', 'VOC유형대', '접수일자', '_cStatusM', '_bizZone', text_col]:
+            if c in _s.columns and c not in _seen:
                 disp_cols.append(c)
-        top20 = scored_df.nlargest(20, '_riskScore')[disp_cols].reset_index(drop=True)
+                _seen.add(c)
+        top20 = _s.nlargest(20, '_riskScore')[disp_cols].reset_index(drop=True)
+        top20 = top20.loc[:, ~top20.columns.duplicated(keep='first')]
         top20 = top20.rename(columns={
             '_riskScore': '리스크점수', '_emScore': '감성점수',
             '_cStatusM': '계약상태', '_bizZone': '영업구역',
