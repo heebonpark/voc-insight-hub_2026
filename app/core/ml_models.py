@@ -214,22 +214,40 @@ def analyze_sentiment(texts: list, model) -> list[str]:
 import re as _re
 
 # 리스크·긴급도 판단용 패턴
-_RISK_EMOTION = _re.compile(r'감성|불만|해지|항의')
-_RISK_URGENT  = _re.compile(r'빠른연락|빠른|긴급|즉시|지금당장')
-_EM_HIGH      = _re.compile(r'감성불만|감성')
-_EM_MED       = _re.compile(r'불만|항의')
-_EM_CHURN     = _re.compile(r'해지|미연락|미방문')
-_EM_URGENT    = _re.compile(r'긴급|비일|즉시')
+_RISK_EMOTION = _re.compile(r'감성|불만|해지|항의|불편|짜증|화남')
+_RISK_URGENT  = _re.compile(r'빠른연락|빠른|긴급|즉시|지금당장|빨리')
+_EM_HIGH      = _re.compile(r'감성불만|감성|강력|심각')
+_EM_MED       = _re.compile(r'불만|항의|불편')
+_EM_CHURN     = _re.compile(r'해지|미연락|미방문|해지징후')
+_EM_URGENT    = _re.compile(r'긴급|비일|즉시|빠른')
+_CHURN_RISK   = _re.compile(r'해지징후 있음|해지 위험|해지예정|해지검토')
 
 _TERM_STATUS  = {'일반해지', '명의해지', '직권해지', '해지'}
 
+# 리텐션 방문활동 관련 패턴
+_VISIT_RISK   = _re.compile(r'해지징후 있음|해지징후있음')
+_VISIT_DONE   = _re.compile(r'완료')
+
+
+def _build_analysis_text(row: dict, text_col: str) -> str:
+    """등록내용 + 처리내용 + 방문활동 완료여부 + 해지상세를 결합한 분석 텍스트"""
+    extras = ['처리내용', '방문활동 완료여부', '해지상세', '담당상세']
+    parts = [str(row.get(text_col, '') or '')]
+    for c in extras:
+        val = str(row.get(c, '') or '').strip()
+        if val and val not in ('nan', '>>', '해당없음'):
+            parts.append(val)
+    return ' '.join(p for p in parts if p.strip())
+
 
 def compute_em_score(text: str) -> int:
-    """감성/긴급도 점수 (0–10). HTML v3의 emScore() 이식"""
+    """감성/긴급도 점수 (0–10)"""
     if not isinstance(text, str):
         return 0
     score = 0
-    if _EM_HIGH.search(text):
+    if _CHURN_RISK.search(text):   # 해지징후 있음 → 최고 위험
+        score += 6
+    elif _EM_HIGH.search(text):
         score += 4
     elif _EM_MED.search(text):
         score += 2
@@ -243,25 +261,49 @@ def compute_em_score(text: str) -> int:
 
 
 def compute_risk_score(row: dict) -> int:
-    """VOC 리스크 점수 (0–30). HTML v3의 calcRisk() 이식"""
+    """VOC 리스크 점수 (0–30).
+    일반 VOC(불만·긴급·해지)와 리텐션 방문활동(해지징후) 복합 판단.
+    """
     score = 0
-    text = str(row.get('등록내용', '') or '')
+    text = _build_analysis_text(row, '등록내용')
 
+    # ── 텍스트 감성/긴급 ──
     if _RISK_EMOTION.search(text):
         score += 6
     if _RISK_URGENT.search(text):
         score += 3
 
+    # ── 처리 상태 ──
     if row.get('상태') == '미접수':
         score += 4
+
+    # ── VOC 유형 ──
     vtype = str(row.get('VOC유형대', '') or '')
     if vtype == '청구 미/이의':
         score += 5
     elif vtype == '해지':
         score += 4
-    if str(row.get('접수횟수', '0') or '0') == '1':
-        score += 4
+    elif vtype == '리텐션':
+        score += 2  # 사전리텐션 = 해지위험 고객 대상
 
+    # ── 방문활동 완료여부 (리텐션 VOC 특화) ──
+    visit = str(row.get('방문활동 완료여부', '') or '')
+    if _VISIT_RISK.search(visit):
+        score += 8  # 해지징후 있음 → 고위험
+    elif visit.strip() and not _VISIT_DONE.search(visit):
+        score += 3  # 방문 미완료
+
+    # ── 접수 횟수 ──
+    try:
+        cnt = int(str(row.get('접수횟수', '0') or '0'))
+        if cnt == 1:
+            score += 2
+        elif cnt >= 3:
+            score += 4  # 반복 접수 고위험
+    except ValueError:
+        pass
+
+    # ── 시설 계약 상태 (매칭된 경우) ──
     cstatus = str(row.get('_cStatusM', '') or '')
     if cstatus == '일시정지':
         score += 2
@@ -274,6 +316,11 @@ def compute_risk_score(row: dict) -> int:
 def add_scores_to_df(df: pd.DataFrame, text_col: str) -> pd.DataFrame:
     """감성 점수·리스크 점수를 DataFrame에 컬럼으로 추가"""
     df = df.copy()
-    df['_emScore']   = df[text_col].apply(compute_em_score) if text_col in df.columns else 0
+    if text_col in df.columns:
+        df['_emScore'] = df.apply(
+            lambda r: compute_em_score(_build_analysis_text(r.to_dict(), text_col)), axis=1
+        )
+    else:
+        df['_emScore'] = 0
     df['_riskScore'] = df.apply(lambda r: compute_risk_score(r.to_dict()), axis=1)
     return df

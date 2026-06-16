@@ -365,13 +365,32 @@ term_count = int(df['_cStatusM'].isin(_TERM_SET).sum()) if '_cStatusM' in df.col
 vtype_cur = next((c for c in df.columns if 'VOC유형대' in c), None)
 billing = int((df[vtype_cur] == '청구 미/이의').sum()) if vtype_cur else 0
 
+# 방문활동 완료여부 컬럼 탐지 (리텐션 VOC)
+_visit_col = next((c for c in df.columns if '방문활동' in c and '여부' in c), None)
+
+# 청구이의가 0이고 방문활동 데이터가 있으면 해지징후로 대체
+_billing_label = '청구·이의 민원'
+if billing == 0 and _visit_col:
+    _churn_risk = int(df[_visit_col].fillna('').str.contains('해지징후').sum())
+    if _churn_risk > 0:
+        billing = _churn_risk
+        _billing_label = '해지징후 감지'
+
 text_col = next(
-    (c for c in df.columns if any(k in c for k in ['등록내용', '내용', '상담', 'VOC', '불만', '접수내용'])),
+    (c for c in df.columns if any(k in c for k in ['등록내용', '내용', '상담', '불만', '접수내용'])),
     None,
 )
 urgent = 0
 if text_col:
-    urgent = int(df[text_col].fillna('').str.contains('감성|불만|빠른연락|긴급').sum())
+    urgent = int(df[text_col].fillna('').str.contains('감성|불만|빠른연락|긴급|해지징후').sum())
+# 방문활동 미완료 건수도 긴급 카운트에 포함
+if _visit_col:
+    _not_done = int(
+        df[_visit_col].fillna('').apply(
+            lambda v: bool(v.strip()) and '완료' not in v
+        ).sum()
+    )
+    urgent = max(urgent, _not_done)
 
 avg_day = '-'
 date_col = next((c for c in df.columns if '접수일' in c), None)
@@ -390,7 +409,7 @@ with c2: render_metric("시설 매칭률",    f"{rate:.1f}%")
 with c3: render_metric("미접수 건수",    f"{unprocessed:,}건")
 with c4: render_metric("정지 시설 VOC",  f"{stop_count:,}건")
 with c5: render_metric("해지 시설 VOC",  f"{term_count:,}건")
-with c6: render_metric("청구·이의 민원", f"{billing:,}건")
+with c6: render_metric(_billing_label,   f"{billing:,}건")
 with c7: render_metric("감성·긴급 VOC",  f"{urgent:,}건")
 with c8: render_metric("일 평균 접수",   avg_day)
 
@@ -474,8 +493,31 @@ with st.expander("📋 컬럼 인식 현황", expanded=False):
             st.caption(f"접수일시 샘플: {' | '.join(str(d) for d in _dt_samples)}")
     st.caption(f"전체 컬럼 수: {len(df.columns)}개 — VOC 총 {len(df):,}건")
 
-all_texts  = df[text_col].dropna().astype(str).tolist()
-valid_texts = [t for t in all_texts if t.strip() and t != 'nan']
+# ── 텍스트 품질 자동 진단: 동일 템플릿 텍스트 감지 → 복합 분석텍스트 생성 ──
+_txt_series = df[text_col].fillna('').astype(str)
+_unique_ratio = _txt_series.nunique() / max(len(_txt_series), 1)
+_analysis_col = text_col  # 실제 NLP에 사용할 컬럼
+
+if _unique_ratio < 0.1 and len(_txt_series) >= 3:
+    _rich_cols = [c for c in ['처리내용', '방문활동 완료여부', 'VOC유형중', 'VOC유형소', '해지상세', '담당상세']
+                  if c in df.columns]
+    if _rich_cols:
+        def _make_combined(row):
+            parts = []
+            for c in _rich_cols:
+                v = str(row[c]).strip()
+                if v and v not in ('nan', '>>', '해당없음', ''):
+                    parts.append(v)
+            return ' '.join(parts) if parts else str(row[text_col])
+        df['_분석텍스트'] = df.apply(_make_combined, axis=1)
+        _analysis_col = '_분석텍스트'
+        st.info(
+            f"**텍스트 자동 최적화** — '{text_col}'이 동일한 시스템 텍스트로 구성되어 있습니다. "
+            f"'{', '.join(_rich_cols)}' 컬럼을 결합한 복합 분석텍스트를 사용합니다."
+        )
+
+all_texts  = df[_analysis_col].dropna().astype(str).tolist()
+valid_texts = [t for t in all_texts if t.strip() and t not in ('nan', '해당없음')]
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "🔀 워크플로우", "🔑 키워드", "📚 토픽 모델링",
@@ -487,11 +529,11 @@ with tab1:
     st.markdown("#### 🔀 VOC 처리 흐름 시각화 (다중조건 동적 Sankey)")
     st.caption("등록내용 기준 파생 컬럼(_감성, _위험등급)을 포함해 단계를 자유롭게 조합하세요.")
 
-    # 등록내용에서 감성·위험등급 파생 컬럼 생성
+    # 분석텍스트 기반 감성·위험등급 파생 컬럼 생성
     wf_df = df.copy()
-    with st.spinner("등록내용 감성·위험등급 계산 중..."):
+    with st.spinner("감성·위험등급 계산 중..."):
         sents_wf = cached_sentiment_rule(
-            tuple(wf_df[text_col].fillna('').astype(str).tolist())
+            tuple(wf_df[_analysis_col].fillna('').astype(str).tolist())
         )
         wf_df['_감성'] = sents_wf
 
@@ -518,12 +560,18 @@ with tab1:
     _rest    = [c for c in _candidate_cols if c not in _derived]
     _all_stage_cols = _derived + _rest
 
-    # 기본 단계: 등록내용 감성 → VOC유형대 → 처리상태
+    # 기본 단계: 실제 데이터에 있는 컬럼 우선 선택
     _default_stages = []
-    for c in ['_감성', 'VOC유형대', '담당자 팀', '상태']:
-        if c in _all_stage_cols:
+    _stage_priority = [
+        '_감성', '_위험등급', '상태', '방문활동 완료여부',
+        'VOC유형대', 'VOC유형중', '처리유형', '담당유형',
+        '관리지사', '관리본부',
+    ]
+    for c in _stage_priority:
+        if c in _all_stage_cols and c not in _default_stages:
             _default_stages.append(c)
-    _default_stages = _default_stages[:3]
+        if len(_default_stages) >= 3:
+            break
 
     stages = st.multiselect(
         "워크플로우 단계 선택 (2~5개, 순서대로 연결됩니다)",
@@ -630,6 +678,8 @@ with tab4:
     rule_tab, dl_tab = st.tabs(["⚡ 규칙 기반 (즉시 실행)", "🧠 딥러닝 (고정밀)"])
 
     with rule_tab:
+        if _analysis_col != text_col:
+            st.caption(f"분석 텍스트: `{_analysis_col}` (처리내용·방문활동 복합)")
         with st.spinner("감성 분석 중..."):
             sents = cached_sentiment_rule(tuple(valid_texts))
         s_df = pd.DataFrame({'텍스트': valid_texts, '감성': sents})
