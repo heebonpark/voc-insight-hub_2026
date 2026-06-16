@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VOC 정보조회 v3 · 시설매칭+분석</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f3f8;--card:#fff;--text:#1a2233;--t2:#5a6478;--t3:#9faabf;
+  --blue:#1a56db;--blue2:#dbeafe;--blue3:#0e3fa0;
+  --green:#16a34a;--green2:#dcfce7;--red:#dc2626;--red2:#fee2e2;
+  --org:#d97706;--org2:#fef3c7;--pur:#7c3aed;--pur2:#ede9fe;
+  --teal:#0891b2;--teal2:#cffafe;--g2:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;
+  --r:10px;--rs:6px;--sh:0 1px 4px rgba(0,0,0,.08);--sh2:0 4px 20px rgba(0,0,0,.13)
+}
+body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
+
+/* HDR */
+.hdr{background:linear-gradient(135deg,#0c1f4a 0%,#1a4faa 100%);color:#fff;padding:0 18px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:300;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hdr-l{display:flex;align-items:center;gap:9px}
+.hdr-badge{background:rgba(255,255,255,.18);border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;letter-spacing:.5px}
+.hdr-title{font-size:15px;font-weight:700}
+.hdr-sub{font-size:11px;opacity:.6;margin-left:5px}
+.hdr-r{display:flex;align-items:center;gap:7px}
+.up-btn{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:6px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s}
+.up-btn:hover{background:rgba(255,255,255,.27)}
+.fac-pill{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+.fac-pill.ok{background:rgba(22,163,74,.22);color:#15803d}
+.fac-pill.wait{background:rgba(251,191,36,.22);color:#92400e}
+
+/* TABS (top nav) */
+.top-nav{background:#fff;border-bottom:1px solid var(--bd);display:flex;padding:0 18px;gap:0;position:sticky;top:54px;z-index:200}
+.tn{padding:11px 16px;font-size:12px;font-weight:700;color:var(--t2);border-bottom:2px solid transparent;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:color .15s}
+.tn:hover{color:var(--blue)}
+.tn.active{color:var(--blue);border-bottom-color:var(--blue)}
+.page{display:none;padding:16px 18px 28px}
+.page.active{display:block}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px;margin-bottom:14px}
+.kpi{background:var(--card);border-radius:var(--r);padding:11px 13px;box-shadow:var(--sh);border-left:3px solid var(--blue);cursor:pointer;transition:box-shadow .15s}
+.kpi:hover{box-shadow:var(--sh2)}
+.kpi-label{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.4px;margin-bottom:3px}
+.kpi-val{font-size:20px;font-weight:700;line-height:1}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+.kpi.b2{border-left-color:var(--org)}.kpi.b3{border-left-color:var(--green)}.kpi.b4{border-left-color:var(--red)}
+.kpi.b5{border-left-color:var(--pur)}.kpi.b6{border-left-color:var(--teal)}.kpi.b7{border-left-color:#64748b}.kpi.b8{border-left-color:#f59e0b}
+
+/* MATCH BUTTONS */
+.match-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.match-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--bd2);background:var(--card);font-size:12px;font-weight:600;cursor:pointer;color:var(--t2);transition:all .15s;font-family:inherit}
+.match-btn:hover{border-color:var(--blue);color:var(--blue)}
+.match-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.match-btn.green.active{background:var(--green);border-color:var(--green)}
+.match-btn.red.active{background:var(--red);border-color:var(--red)}
+.match-btn.org.active{background:var(--org);border-color:var(--org)}
+.match-btn.pur.active{background:var(--pur);border-color:var(--pur)}
+.match-lbl{font-size:11px;color:var(--t3);margin-left:4px}
+
+/* FILTER */
+.flt-panel{background:var(--card);border-radius:var(--r);padding:13px 15px;box-shadow:var(--sh);margin-bottom:14px}
+.flt-title{font-size:12px;font-weight:700;color:var(--t2);margin-bottom:9px}
+.flt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px;margin-bottom:9px}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.3px}
+.fg select,.fg input{border:1px solid var(--bd2);border-radius:var(--rs);padding:5px 8px;font-size:12px;color:var(--text);background:var(--g2);font-family:inherit;outline:none;width:100%}
+.fg select:focus,.fg input:focus{border-color:var(--blue);background:#fff}
+.flt-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sw{position:relative;flex:1;min-width:180px}
+.sw input{padding:5px 8px 5px 28px;width:100%;border:1px solid var(--bd2);border-radius:var(--rs);font-size:12px;background:var(--g2);outline:none;font-family:inherit}
+.sw input:focus{border-color:var(--blue);background:#fff}
+.sw-ico{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--t3);pointer-events:none}
+.tag-wrap{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.atag{background:var(--blue2);color:var(--blue3);border-radius:20px;padding:2px 10px 2px 8px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer}
+.btn{padding:5px 13px;border-radius:var(--rs);border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;transition:all .15s}
+.btn-p{background:var(--blue);color:#fff}.btn-p:hover{background:var(--blue3)}
+.btn-s{background:var(--g2);color:var(--t2);border:1px solid var(--bd2)}.btn-s:hover{background:var(--bd)}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* CHARTS */
+.ch-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.ch-card{background:var(--card);border-radius:var(--r);padding:13px;box-shadow:var(--sh)}
+.ch-card h4{font-size:12px;font-weight:700;color:var(--t2);margin-bottom:9px}
+.ch-wrap{position:relative;width:100%;height:150px}
+
+/* TABLE */
+.tbl-card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.tbl-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--bd)}
+.tbl-title{font-size:13px;font-weight:700}
+.tbl-r{display:flex;gap:7px;align-items:center}
+.cnt{font-size:12px;color:var(--t3)}.cnt b{color:var(--blue)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:1250px}
+thead th{background:var(--g2);padding:8px 9px;text-align:left;font-size:11px;font-weight:700;color:var(--t2);border-bottom:2px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;z-index:1}
+thead th:hover{background:var(--bd)}
+thead th.asc::after{content:' ↑';color:var(--blue)}thead th.desc::after{content:' ↓';color:var(--blue)}
+.th-m{background:linear-gradient(180deg,#e8f0fe,#f1f5f9) !important;color:#1e40af !important;border-bottom:2px solid #93c5fd !important}
+tbody tr{border-bottom:1px solid var(--g2);transition:background .1s;cursor:pointer}
+tbody tr:hover{background:#eef4ff}
+tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
+.bdg{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-g{background:var(--green2);color:#15803d}.b-b{background:var(--blue2);color:#1d4ed8}
+.b-r{background:var(--red2);color:#b91c1c}.b-o{background:var(--org2);color:#92400e}
+.b-p{background:var(--pur2);color:#6d28d9}.b-t{background:var(--teal2);color:#0e7490}
+.b-gr{background:var(--g2);color:var(--t2)}.b-y{background:#fef9c3;color:#854d0e}
+.b-stop{background:#fef3c7;color:#b45309;border:1px solid #fcd34d}
+.b-term{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.cc{max-width:190px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;line-height:1.5;color:var(--t2)}
+.sn{font-family:monospace;font-size:11px}
+.zt{font-size:10px;background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:4px;font-family:monospace}
+.match-why{font-size:10px;color:var(--teal);font-weight:600}
+.no-match-dim{color:var(--t3);font-size:11px}
+
+/* PAGINATION */
+.pg{display:flex;justify-content:center;gap:4px;padding:10px}
+.pg-b{padding:4px 10px;border-radius:5px;border:1px solid var(--bd2);background:#fff;cursor:pointer;font-size:12px;color:var(--t2);font-family:inherit}
+.pg-b.cur{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
+.pg-b:disabled{opacity:.4;cursor:default}
+
+/* MODAL */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500}
+.ov.open{display:flex;align-items:flex-start;justify-content:center;padding:30px 14px;overflow-y:auto}
+.modal{background:#fff;border-radius:16px;width:860px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,.3);margin:auto}
+.mhd{padding:18px 22px 0;display:flex;align-items:flex-start;justify-content:space-between}
+.mc{background:none;border:none;cursor:pointer;font-size:20px;color:var(--t3);padding:4px;line-height:1}
+.mc:hover{color:var(--red)}
+.mbody{padding:14px 22px 22px}
+.tab-row{display:flex;gap:0;border-bottom:1px solid var(--bd);margin-bottom:13px}
+.tb{padding:8px 15px;font-size:12px;font-weight:700;color:var(--t2);border-bottom:2px solid transparent;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.tb.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tp{display:none}.tp.active{display:block}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px}
+.dg3{grid-template-columns:1fr 1fr 1fr}
+.di{background:var(--g2);border-radius:var(--rs);padding:9px 11px}
+.di label{display:block;font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.3px;margin-bottom:2px}
+.di .v{font-size:13px;font-weight:600;color:var(--text)}
+.ds{margin-bottom:12px}
+.ds h4{font-size:12px;font-weight:700;color:var(--t2);margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--bd)}
+.cbox{background:var(--g2);border-radius:var(--rs);padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.7;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow-y:auto}
+.pbox{background:#f0fdf4;border:1px solid #86efac;border-radius:var(--rs);padding:9px 11px;font-size:12px;color:#15803d;line-height:1.6}
+.ms{background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #93c5fd;border-radius:var(--r);padding:13px;margin-bottom:12px}
+.ms h4{font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:10px}
+.mdg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mi{background:rgba(255,255,255,.85);border-radius:var(--rs);padding:8px 10px;border:1px solid #bfdbfe}
+.mi label{font-size:10px;font-weight:700;color:#3b82f6;display:block;margin-bottom:2px}
+.mi .v{font-size:12px;font-weight:600;color:#1e3a8a}
+.nm-box{background:#fef9c3;border:1px solid #fcd34d;border-radius:var(--r);padding:12px 14px;font-size:12px;color:#92400e}
+.rb{background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-top:4px}
+.rf{height:100%;border-radius:4px;transition:width .4s}
+.match-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.match-svc{background:#dcfce7;color:#15803d}
+.match-cno{background:#dbeafe;color:#1d4ed8}
+.match-cust{background:#ede9fe;color:#6d28d9}
+.match-name{background:#fef3c7;color:#92400e}
+
+/* ANALYSIS PAGE */
+.tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:16px}
+.tech-card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:13px;cursor:pointer;transition:all .2s}
+.tech-card:hover,.tech-card.sel{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue2)}
+.tn-num{font-size:20px;margin-bottom:4px}
+.tn-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.tn-desc{font-size:11px;color:var(--t3);line-height:1.4}
+.res-card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px}
+.res-card h3{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.pb{background:var(--g2);border-radius:4px;height:7px;overflow:hidden;margin-top:3px}
+.pf{height:100%;border-radius:4px}
+.ai-box{background:linear-gradient(135deg,#ede9fe,#dbeafe);border:1px solid #c4b5fd;border-radius:var(--r);padding:13px;margin-bottom:14px}
+.ai-hd{font-size:12px;font-weight:700;color:var(--pur);margin-bottom:7px}
+.ai-box ul{margin:0;padding-left:16px}
+.ai-box li{font-size:12px;color:#3730a3;margin-bottom:4px;line-height:1.5}
+
+/* MISC */
+.no-data{text-align:center;padding:40px;color:var(--t3);font-size:13px}
+.hl{background:#fef08a;border-radius:2px}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.tc{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.tc:hover{opacity:.8}
+.progress-row{margin-bottom:7px}
+
+@media(max-width:768px){
+  .kpi-row{grid-template-columns:repeat(3,1fr);gap:7px}
+  .ch-row{grid-template-columns:1fr}
+  .flt-grid{grid-template-columns:1fr 1fr}
+  .hdr-sub{display:none}
+  .dg3,.mdg{grid-template-columns:1fr 1fr}
+  .tech-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .flt-grid{grid-template-columns:1fr}
+  .dg,.dg3,.mdg{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-l">
+    <span class="hdr-badge">VOC</span>
+    <span class="hdr-title">정보조회 v3 · 시설매칭 + 분석</span>
+    <span class="hdr-sub">강북/강원사업지원팀 · KT Security</span>
+  </div>
+  <div class="hdr-r">
+    <span id="facPill" class="fac-pill wait">📂 시설파일 미업로드</span>
+    <label class="up-btn">📋 VOC파일
+      <input type="file" id="vocFile" accept=".xls,.xlsx" style="display:none" onchange="loadVOC(event)">
+    </label>
+    <label class="up-btn">🏢 시설CSV
+      <input type="file" id="facFile" accept=".csv" style="display:none" onchange="loadFAC(event)">
+    </label>
+    <button class="up-btn" onclick="exportCSV()">⬇ CSV</button>
+  </div>
+</div>
+
+<div class="top-nav">
+  <button class="tn active" onclick="showPage('dash',this)">📊 대시보드</button>
+  <button class="tn" onclick="showPage('list',this)">📋 VOC 목록</button>
+  <button class="tn" onclick="showPage('analysis',this)">🧠 전문가 분석</button>
+</div>
+
+<!-- PAGE: DASHBOARD -->
+<div class="page active" id="page-dash">
+  <div class="kpi-row" id="kpiBar"></div>
+  <div class="ai-box" id="aiBox" style="display:none">
+    <div class="ai-hd">🤖 AI 자동 인사이트</div>
+    <ul id="aiList"></ul>
+  </div>
+  <div class="ch-row">
+    <div class="ch-card"><h4>📊 VOC유형대 분포</h4><div class="ch-wrap"><canvas id="cType" role="img" aria-label="VOC유형대 분포">VOC유형대 분포</canvas></div><div id="typeLeg" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;font-size:10px"></div></div>
+    <div class="ch-card"><h4>🏢 지사별 현황</h4><div class="ch-wrap"><canvas id="cBranch" role="img" aria-label="지사별">지사별</canvas></div></div>
+    <div class="ch-card"><h4>🔗 시설매칭 계약상태</h4><div class="ch-wrap"><canvas id="cState" role="img" aria-label="계약상태">계약상태</canvas></div></div>
+  </div>
+</div>
+
+<!-- PAGE: LIST -->
+<div class="page" id="page-list">
+  <!-- 매칭 필터 버튼 -->
+  <div class="match-btn-row" id="matchBtnRow">
+    <span style="font-size:12px;font-weight:700;color:var(--t2)">매칭 조건:</span>
+    <button class="match-btn active" onclick="setMatchFilter('all',this)">전체</button>
+    <button class="match-btn green" onclick="setMatchFilter('matched',this)">✅ 매칭 있음</button>
+    <button class="match-btn red" onclick="setMatchFilter('unmatched',this)">❌ 미매칭</button>
+    <button class="match-btn" onclick="setMatchFilter('svc',this)">🔑 서비스번호 매칭</button>
+    <button class="match-btn" onclick="setMatchFilter('cno',this)">📄 계약번호 매칭</button>
+    <button class="match-btn" onclick="setMatchFilter('cust',this)">👤 고객번호 매칭</button>
+    <button class="match-btn" onclick="setMatchFilter('name',this)">🏪 상호명 매칭</button>
+    <button class="match-btn org" onclick="setMatchFilter('stop',this)">⏸ 정지 시설</button>
+    <button class="match-btn red" onclick="setMatchFilter('term',this)">🔴 해지 시설</button>
+    <span class="match-lbl" id="matchLbl"></span>
+  </div>
+
+  <div class="flt-panel">
+    <div class="flt-title">🔍 다중조건 검색</div>
+    <div class="flt-grid">
+      <div class="fg"><label>상태</label>
+        <select id="f_st" onchange="applyFilter()">
+          <option value="">전체</option><option>미접수</option><option>접수</option>
+          <option>처리중</option><option>처리완료</option><option>결재요청</option>
+        </select>
+      </div>
+      <div class="fg"><label>담당유형</label>
+        <select id="f_dt" onchange="applyFilter()">
+          <option value="">전체</option><option>SP</option><option>SE</option>
+          <option>SG</option><option>본사</option><option>지사</option><option>협력사</option>
+        </select>
+      </div>
+      <div class="fg"><label>VOC유형대</label>
+        <select id="f_vt" onchange="applyFilter()"><option value="">전체</option></select>
+      </div>
+      <div class="fg"><label>관리지사</label>
+        <select id="f_br" onchange="applyFilter()">
+          <option value="">전체</option>
+          <option>강북지사</option><option>서대문지사</option><option>고양지사</option>
+          <option>의정부지사</option><option>남양주지사</option><option>중앙지사</option>
+          <option>강릉지사</option><option>원주지사</option>
+        </select>
+      </div>
+      <div class="fg"><label>P/N/G</label>
+        <select id="f_png" onchange="applyFilter()">
+          <option value="">전체</option><option value="I">I</option>
+          <option value="P2">P2</option><option value="N2">N2</option>
+          <option value="N3">N3</option><option value="G">G</option>
+        </select>
+      </div>
+      <div class="fg"><label>계약상태(중) — 시설</label>
+        <select id="f_cs" onchange="applyFilter()">
+          <option value="">전체</option><option>유지</option><option>명변유지</option>
+          <option>일시정지</option><option>청구설변</option><option>일반해지</option>
+          <option>명변해지</option><option>전출해지</option>
+        </select>
+      </div>
+      <div class="fg"><label>영업구역번호</label>
+        <input type="text" id="f_zone" placeholder="G000xxx" oninput="applyFilter()">
+      </div>
+    </div>
+    <div class="flt-row2">
+      <div class="sw"><span class="sw-ico">🔍</span>
+        <input type="text" id="f_kw" placeholder="서비스번호 · 상호 · 고객번호 · 등록내용 · 연락처 검색..." oninput="applyFilter()">
+      </div>
+      <button class="btn btn-p" onclick="applyFilter()">검색</button>
+      <button class="btn btn-s" onclick="resetFilter()">초기화</button>
+    </div>
+    <div class="tag-wrap" id="tagWrap"></div>
+  </div>
+
+  <div class="tbl-card">
+    <div class="tbl-hd">
+      <div class="tbl-title">📋 VOC 목록 <span style="font-size:11px;font-weight:400;color:var(--teal);margin-left:5px">파란 헤더 = 시설매칭 컬럼</span></div>
+      <div class="tbl-r">
+        <span class="cnt">조회 <b id="fCnt">0</b>건 / 전체 <b id="tCnt">0</b>건</span>
+        <select id="pgSel" onchange="pgSz=+this.value;pg=1;renderTable()" style="border:1px solid var(--bd2);border-radius:5px;padding:4px 8px;font-size:11px;font-family:inherit">
+          <option value="15">15행</option><option value="30">30행</option>
+          <option value="50">50행</option><option value="100">100행</option>
+        </select>
+      </div>
+    </div>
+    <div class="tw">
+      <table id="vocTbl">
+        <thead><tr>
+          <th style="width:28px">#</th>
+          <th onclick="srt('상태')" style="width:58px">상태</th>
+          <th onclick="srt('담당유형')" style="width:48px">담당</th>
+          <th onclick="srt('서비스번호')" style="width:80px">서비스번호</th>
+          <th onclick="srt('상호')" style="width:130px">상호</th>
+          <th onclick="srt('관리지사')" style="width:68px">관리지사</th>
+          <th onclick="srt('VOC유형대')" style="width:72px">유형대</th>
+          <th onclick="srt('VOC유형')" style="width:125px">VOC유형</th>
+          <th style="width:185px">등록내용</th>
+          <th onclick="srt('접수일시')" style="width:76px">접수일</th>
+          <th class="th-m" onclick="srt('_bizZone')" style="width:75px">영업구역번호</th>
+          <th class="th-m" style="width:100px">연락처</th>
+          <th class="th-m" onclick="srt('_cStatusM')" style="width:65px">계약상태(중)</th>
+          <th class="th-m" onclick="srt('_stopDate')" style="width:68px">정지시작일</th>
+          <th class="th-m" onclick="srt('_termDate')" style="width:65px">해지일자</th>
+          <th class="th-m" style="width:62px">담당자</th>
+          <th class="th-m" style="width:55px">매칭방식</th>
+        </tr></thead>
+        <tbody id="vocBody"></tbody>
+      </table>
+    </div>
+    <div class="pg" id="pgBar"></div>
+  </div>
+</div>
+
+<!-- PAGE: ANALYSIS -->
+<div class="page" id="page-analysis">
+  <div class="ai-box">
+    <div class="ai-hd">🧠 전문가 TOP10 VOC 분석 기법</div>
+    <ul><li>아래 기법 카드를 클릭하면 현재 데이터에 즉시 적용된 분석 결과를 확인합니다.</li>
+    <li>시설파일 업로드 시 계약상태·영업구역 데이터도 함께 분석됩니다.</li></ul>
+  </div>
+  <div class="tech-grid" id="techGrid"></div>
+  <div id="techResult" style="display:none">
+    <div class="res-card" id="techResultBody"></div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="ov" id="ov" onclick="if(event.target===this)closeM()">
+  <div class="modal">
+    <div class="mhd">
+      <div>
+        <div style="font-size:16px;font-weight:700" id="mTitle"></div>
+        <div style="font-size:12px;color:var(--t3);margin-top:2px" id="mSub"></div>
+      </div>
+      <button class="mc" onclick="closeM()">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="tab-row">
+        <button class="tb active" onclick="showTab('v',this)">📋 VOC</button>
+        <button class="tb" onclick="showTab('f',this)">🏢 시설매칭</button>
+        <button class="tb" onclick="showTab('c',this)">📄 계약</button>
+      </div>
+      <div id="tab-v" class="tp active"></div>
+      <div id="tab-f" class="tp"></div>
+      <div id="tab-c" class="tp"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ EMBEDDED DATA ═══
+const EVOC = [{"상태":"미접수","지령여부":"N","고객번호":"30685271","계약번호":"51405693","서비스번호":"61810649","고객명":"이기*","상호":"이기향","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-4624-5174/이기향/기가앱 일부영상확인불/농장 설치된 cctv/ 당일 방문해서 선정리하고 나서 2번 카메라 영상불/일주일에 한 번 감(화)/다음주 화요일까지 조치할 수 없어서 담당자 방문해서 점검 요청/\n\n핸드폰기종 갤럭시\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 비해당\n신원확인여부 O","처리자":"","처리유형":">>","처리내용":"","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616154206178","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.05.22","계약종료일":"2027.08.31","월정료(VAT미포함)":"47,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30942230","계약번호":"51873961","서비스번호":"62803996","고객명":"장진*","상호":"장진희","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS일정","VOC유형":"AS방문일정문의","해지상세":"","AS상세":"","등록내용":"010-4814-2535/김봉규/카메라 2대 영상불/기사가 방문하여 확인시 텔레캅에서 막았다고 안내 받음/연락요청 했으나 연락없음/방문전 빠른연락 요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"협력사","담당상세":"G09981","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616154103176","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.10.06","계약종료일":"2026.10.05","월정료(VAT미포함)":"72,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31200086","계약번호":"52310763","서비스번호":"63646115","고객명":"설기*","상호":"일산길푸드","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"명의변경","VOC유형":"명의변경요청(계약자변경)","해지상세":"","AS상세":"","등록내용":"010-4472-7085/설기철/온라인명의변경 양수인 링크 재전송 했으나 미수신/서류 첨부 후 다음 클릭 비활성화/지속미수신 주장으로 온라인 진행 불가/방문진행필요","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000303","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616153605158","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes view(200만)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.10.13","계약종료일":"2028.10.12","월정료(VAT미포함)":"43,000","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30911913","계약번호":"51817066","서비스번호":"62680696","고객명":"안유*","상호":"등대한식부페(dvr)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-3525-4243/안용진/모바일 영상확인중/ 로그인불가 / 원격거부 / 담당자 방문후 진행요청/ ddns정상/ 선연락후방문요청 \n\n핸드폰기종- 삼성용\n어플명-토탈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-일치\n신원확인여부-일치","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/통합앱/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:37:57.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616153457156","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2023.06.16","계약종료일":"2027.05.31","월정료(VAT미포함)":"30,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30724263","계약번호":"51474434","서비스번호":"61955883","고객명":"김현*","상호":"김현경가정집(GiGAeyes i-guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-8119-2442/김현경/카메라 두대를 철거 하고싶다/비용부담","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000506","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616153023142","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-guard","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.09.14","계약종료일":"2026.09.13","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31012847","계약번호":"52004878","서비스번호":"63082845","고객명":"이승*","상호":"대한예수교장로회영은교회","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-3717-0080/김대성(안수집사님)/카메라 추가 요청/카메라 2~3대 추가 요청/빠른 연락 요청\nㄴ주차장 카메라 1대 화소 높은걸로 바꿔줄 수 있는지 문의","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000209","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616152838138","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.10.30","계약종료일":"2027.10.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30605731","계약번호":"51264902","서비스번호":"61553039","고객명":"김현*","상호":"노랑통닭-방학점(GiGAeyes guard)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-4731-1553/김현동/토탈서비스앱계약인증완/영상보안-서비스미가입/ddns 도메인조회됨/계약인증아이디/ redqpt\nddns 조회됨, 웹포트만 불량, 장치등록요청 \n\n\n핸드폰기종 미확인\n어플명 토탈앱\n인터넷이상유무 정상 \n메인아이디일치여부 일치 \n통합앱고객명일치여부 일치\n신원확인여부 확인","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:37:09.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616152752130","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2020.08.11","계약종료일":"2027.04.30","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30981675","계약번호":"52031691","서비스번호":"63140177","고객명":"박보*","상호":"뉴발란스 상봉","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-9596-0714/ 박준호/5분 후 재연락 요청/어플 접속이 안되요/ddns불량[간편AS] ddns/인터넷정상/포트 불량/녹화기 재부팅했으나 동일\n부재로 직접 진행불/매장 매니저에게 연락 요청   \n요청자: 010-4244-2552/박보현/\n\n핸드폰기종 갤럭시\n어플명 토탈서비스앱\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 O\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:37:33.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616152622124","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.08.30","계약종료일":"2027.08.29","월정료(VAT미포함)":"60,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30509432","계약번호":"51064075","서비스번호":"61277178","고객명":"장선*","상호":"동두천시장애인생활이동지원센터","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_출입통제","해지상세":"","AS상세":"","등록내용":"031-865-0030/이승희/올인원 윈도우 서비스 서버 정전 유무 확인하라고 나옴/서버 상태 중지됨으로 나옴/방문시 비용발생 안내","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"처리완료/방범/올인원/라이센스재발급","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:35:55.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616152347108","클레임구분":"해당없음","서비스대":"판매상품","서비스중":"출입통제","서비스소":"","회선방식대":"무회선","회선방식중":"판매상품","서비스개시일":"2019.02.14","계약종료일":"2026.07.31","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30693611","계약번호":"51420211","서비스번호":"61841067","고객명":"속초반야지역자활센*","상호":"속초지역자활센터희망나르미(보안)(GiGAeyes i-guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이전","VOC유형":"이전설치","해지상세":"","AS상세":"","등록내용":"010-2589-0143/최형규/이전상담 연락요청/전입주소: 속초시 노학동 1265-71/6.19일 이사예정","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000103","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616152142098","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-guard","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.06.18","계약종료일":"2027.06.30","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30138641","계약번호":"50359738","서비스번호":"60441070","고객명":"이수*","상호":"예술문학대건국대학교유업햄(OCT)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-6242-5180/이정훈/ 피시원격제어 \ncmsp 2.4.8 설치후 토탈앱 로그인성공\n60864989,  60441070 2개 시설은 cms에 장치 미등록상태\nfns 및 비번 모름\nNVR1 장비정보 확인요청\n\n\n핸드폰기종 미해당\n어플명 미해당\n인터넷이상유무 정상\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 확인","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/녹화기/원격불가장비(아이디스)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:35:19.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616152122096","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(NVR)","회선방식대":"공중회선","회선방식중":"메인","서비스개시일":"2014.05.28","계약종료일":"2026.07.31","월정료(VAT미포함)":"80,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31087641","계약번호":"52115471","서비스번호":"63280474","고객명":"센티피드컴퍼*","상호":"센터피드","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"청구 미/수납 불만","VOC유형":"요청처리 지연","해지상세":"","AS상세":"","등록내용":"010-5364-2316/최인순/[26.06.11-1차접수/26.06.12-2차 접수 미처리로 재인입/처리 지연불만, 환급이 늦어지고 있다고 강성 불만 ]/26.06.11.해지 시설/kt인터넷청구,국민가상계좌 이중입금건 환급 요청/26.05.12.국민가상계좌 24,750원,26.06.09.국민가상계좌 24,750원 2회는 환급을 받아야 한다고 주장","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"강북지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616152024086","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2019.05.27","계약종료일":"2027.05.26","월정료(VAT미포함)":"27,500","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31091553","계약번호":"52119383","서비스번호":"63284386","고객명":"주식회사 재*","상호":"카페하우스","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-8398-5646/안지수(직원)/기가앱/카메라 1대 영상불/영상이 원활히 재생되고있지 않음 문구뜸/조작미숙 장비리셋불가/6.8 as접수 점검받았으나 동일카메라 동일증상반복/재발하지않게 조치요청/선 연락 후 방문요청 [캠단선]\n\n핸드폰기종 갤럭시상세기종탐색불\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 불일치\n통합앱고객명일치여부 해당없음\n신원확인여부 신원확인불","처리자":"박영운","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:29:29.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616152020084","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2020.07.15","계약종료일":"2026.07.14","월정료(VAT미포함)":"57,000","접수횟수":"1","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30577381","계약번호":"51197548","서비스번호":"61457954","고객명":"김미*","상호":"삼한중기","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-7369-8225/김미숙/카메라 위치변경 및 카메라 화질이 좋지 않다며 카메라 교체상담요청/재약정할경우 무상으로 처리 가능한지 담당자 당일중으로 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000301","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616151952082","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2020.03.06","계약종료일":"2026.11.30","월정료(VAT미포함)":"40,000","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30813554","계약번호":"51635824","서비스번호":"62298796","고객명":"최재*","상호":"최재원","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-9008-9417/최재원/기가앱/전체영상불/장애문구뜸/장비재부팅 후 동일증상/인터넷정상/핸드폰재부팅완료/방문전 선연락\n\n\n핸드폰기종 아이폰\n어플명 기가앱\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 미해당\n신원확인여부 O","처리자":"박영운","처리유형":"서비스>>기타","처리내용":"처리완료/영상/기가앱/사용방법설명","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:28:44.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616151826072","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.07.09","계약종료일":"2026.07.08","월정료(VAT미포함)":"32,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31112373","계약번호":"52140203","서비스번호":"63305206","고객명":"김명*","상호":"김명덕","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-5485-9098/김명덕/기가앱/전체영상불/인터넷정상/영상이 원활히 재생되고있지 않음 문구뜸/장비리셋해도 증상동일/인터넷불로 점검완료/인터넷정상복구상태/선 연락 후 방문요청\n\n핸드폰기종 갤럭시상세기종탐색불\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 일치\n통합앱고객명일치여부 해당없음\n신원확인여부 신원확인완료","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:25:55.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616151659068","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2020.10.14","계약종료일":"2026.10.13","월정료(VAT미포함)":"27,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"","계약번호":"","서비스번호":"","고객명":"*","상호":"","VOC유형대":"업무협조","VOC유형중":"기타","VOC유형소":"지사문의","VOC유형":"지사문의/안내","해지상세":"","AS상세":"","등록내용":"031-930-5343/송라훈(경기북구청 고양경찰서 경비업담당  경장)/고양덕양구 담당자분과 통화요청/본청 업체 업무협약건 학생 통학로 등하교길 민간경비업체 운영가능한 차량들, 담당자 교대시간 정보확인요청/특정주소지가 아님/고양덕양구 일대 전체/업체에서 거점 가능한 차량이 몇대 가능한지 문의[경찰청]","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"고양지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616151602060","클레임구분":"해당없음","서비스대":"","서비스중":"","서비스소":"","회선방식대":"","회선방식중":"","서비스개시일":"","계약종료일":"","월정료(VAT미포함)":"","접수횟수":"0","본사":"","팀":"","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30693611","계약번호":"51994150","서비스번호":"63060748","고객명":"속초지역자활센*","상호":"속초지역자활센터-햇살나눔(보안)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이전","VOC유형":"이전설치","해지상세":"","AS상세":"","등록내용":"010-2589-0143/최형규/이전상담 연락요청/전입주소:속초시 만천7길 13-2/6.19일 이사예정","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000103","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616151513056","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.06.11","계약종료일":"2027.06.10","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리중","지령여부":"N","고객번호":"31253325","계약번호":"52424437","서비스번호":"63890732","고객명":"윤영*","상호":"오늘내일모레","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-9415-1541/윤지연(가족)/사장이지/설치한 카메라 주간은 화면이 밝음 조절요청/적외선 모드일때 화각이 좁아지는데 정상인지 문의\n\n핸드폰기종 아이폰\n어플명 사장이지\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 미해당\n신원확인여부 O","처리자":"권진수","처리유형":">>","처리내용":"17일 11시이후 연락요청","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616151411048","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2026.05.29","계약종료일":"2029.05.28","월정료(VAT미포함)":"17,000","접수횟수":"1","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30865959","계약번호":"51420466","서비스번호":"61841594","고객명":"르메이에르종로타운 관리*","상호":"르메이에르종로타운  관리단","VOC유형대":"해지","VOC유형중":"해지징후","VOC유형소":"징후처리불만","VOC유형":"징후처리지연","해지상세":"","AS상세":"","등록내용":"010-3768-8949/윤우섭/재약정 할인 문의 요청건 재인입 빠른 연락 요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000401","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616151202040","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-special","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.06.25","계약종료일":"2026.06.24","월정료(VAT미포함)":"1,624,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"256","계약번호":"6216","서비스번호":"6216","고객명":"남재*","상호":"주공마트(OCT)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-8387-8007/남재우/녹화기 모니터 비율이 작아진거 같다심/장비재부팅 후 동일증상/조작미숙 방문진행요청/NVR\n\n핸드폰기종 X\n어플명 X\n인터넷이상유무 X\n메인아이디일치여부 X\n통합앱고객명일치여부 X\n신원확인여부 O","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/녹화기/원격불가장비(아이디스)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:09:20.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616150557014","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(NVR)","회선방식대":"공중회선","회선방식중":"메인","서비스개시일":"1998.09.24","계약종료일":"2027.05.30","월정료(VAT미포함)":"100,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30718507","계약번호":"51464138","서비스번호":"61935067","고객명":"박시*","상호":"다복빌라","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-5377-4407/박시열/핸드폰 기기 변경 후 앱 설치 및 로그인불가, 통화중 문자 확인불가 유선안내 진행불가\n방문요청\n\n핸드폰기종 미확인\n어플명 기가아이즈 \n인터넷이상유무 정상 \n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당 \n신원확인여부 확인","처리자":"박영운","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/기가앱/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:01:13.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616145737988","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.08.26","계약종료일":"2026.08.25","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30994045","계약번호":"51969706","서비스번호":"63008578","고객명":"지주*","상호":"피자나라치킨공주(view)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"센터방어","VOC유형":"[실패]불편사항없음","해지상세":"휴/폐업","AS상세":"","등록내용":"010-4732-4405/지주환/해지요청/폐업/불편사항:없음\nㄴ명의변경 및 이전장소 없음/위약금감수해지\nㄴ사업자조회 : ㅇ\nㄴ약정종료일자 : 2027-04-21\nㄴ해지정산금 당일기준 : 130,426원(VAT별도)","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000202","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616145126956","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.04.22","계약종료일":"2027.04.21","월정료(VAT미포함)":"30,000","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31011306","계약번호":"52001875","서비스번호":"63076552","고객명":"고분*","상호":"동부컨테이너","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-3846-1550/고분희/모바일 영상확인중/카메라 1대 낮에는정상송출이나 야간에만 영상확인불가 /점검요청 /메인아이디 사용중/ ddns인터넷영상정상웹불량/ \n\n핸드폰기종-삼성용\n어플명-토탈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-일치\n신원확인여부-완료","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:49:01.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616144441940","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes view(200만)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.06.20","계약종료일":"2027.06.19","월정료(VAT미포함)":"40,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"30340100","계약번호":"50742067","서비스번호":"60892420","고객명":"최경*","상호":"최경자가정집(KT OCT 뷰-NVR)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"해지처리불만","VOC유형":"해지요청 처리지연","해지상세":"","AS상세":"","등록내용":"010-5364-2101/최경자/06.12voc연락없다 불만 재인입/해지건때문에 서울에서 와서 삼일째 머무르고 있는데 연락이 전혀없다며 언제까지 기다려야 하냐며 강성불만/빠른연락요청","처리자":"안상현","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000206","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616144435938","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"kt OCT 뷰(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2017.01.31","계약종료일":"2027.06.15","월정료(VAT미포함)":"32,000","접수횟수":"1","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30866158","계약번호":"51733976","서비스번호":"62503651","고객명":"주식회사 세이브앤*","상호":"세이브앤코(GiGAeyes i-guard)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"불필요","AS상세":"","등록내용":"010-8894-9064/임윤아(직원)/이사로 인해 해지요청/불편사항 없음/[홈페이지]\nㄴ6.25일 전까지는 장비 철거해야 한다고 함/빠른연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000207","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616144201932","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-guard","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.12.30","계약종료일":"2026.12.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30568012","계약번호":"51177620","서비스번호":"61429199","고객명":"권경*","상호":"그날","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"센터방어","VOC유형":"[실패]불편사항없음","해지상세":"불필요","AS상세":"","등록내용":"010-4390-1231/권경임/[할인방어실패]사용불필요해지요청/불편사항없음/명의변경, 이전설치장소 없음","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000104","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616143746906","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2020.01.10","계약종료일":"2026.09.30","월정료(VAT미포함)":"22,700","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30851566","계약번호":"51702283","서비스번호":"62442866","고객명":"유인*","상호":"톰그레이하운드","VOC유형대":"설치/철거","VOC유형중":"철거","VOC유형소":"L형 상품","VOC유형":"철거요청","해지상세":"","AS상세":"","등록내용":"010-9156-0845/유인석/현 시설 정상적으로 철거되었는지 문의/철거하겠다고 배우자님꼐연락은 몇 번 왔다고 하는데 실제철거여부안내를 못받으셨다함/만약 철거완료됐다면 별도 회신주시지않아도된다함/","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"고양지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616143657904","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2022.11.04","계약종료일":"2026.10.31","월정료(VAT미포함)":"30,000","접수횟수":"0","본사":"고객서비스본부","팀":"시공품질팀","P/N/G":"N3","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30756648","계약번호":"51534069","서비스번호":"62081475","고객명":"송용*","상호":"돌섬","VOC유형대":"변경/조회","VOC유형중":"약관/보험","VOC유형소":"약관","VOC유형":"약관/이용계약서요청","해지상세":"","AS상세":"","등록내용":"010-4167-2164/송용범/계약서 메일 발송 요청\nㄴ약정기간 만료로 재역정 요금할인 가능함 안내\nㄴ메일 : tacan2@nate.com","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000202","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616143218890","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.05.03","계약종료일":"2027.03.31","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30156835","계약번호":"50381515","서비스번호":"60467548","고객명":"곽영*","상호":"곽영준가정집(KTOCT-view)","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"청구 미/수납 불만","VOC유형":"요청처리 지연","해지상세":"","AS상세":"","등록내용":"010-9936-2478/곽다예/2026-06-15 접수한 해지일자 오등록 건, 재인입/해지날짜 5.15 변경 및 요금조정 요청/해지할 때부터 접수만 하면 처리가 늦다며 강성 불만/빠른처리 후 연락 요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"원주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616142945880","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"kt OCT 뷰(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2014.08.12","계약종료일":"2027.02.19","월정료(VAT미포함)":"22,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"31026249","계약번호":"52029615","서비스번호":"63135743","고객명":"우용*","상호":"뉴발란스키즈춘천점(GiGAeyes guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이용변경불만","VOC유형":"변경처리지연","해지상세":"","AS상세":"","등록내용":"010-2334-2599/이현숙/[26.06.16.1차 접수후 미처리로 재인입/무전화,처리지연 ]/2층 창고 감지기 위치 변경 요청/출입문 공사가 있었고 현재 잠금이 되지 않아 보안 우려가 있다고 함/언제 오는지 빠른 통화후 방문 요청/1차 독촉","처리자":"안상현","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000206","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616142934878","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.08.30","계약종료일":"2027.08.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31252133","계약번호":"52421697","서비스번호":"63884820","고객명":"한상*","상호":"(주)콘크리트공작소","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-8684-8197/김태룡(직원)/기가앱/인터넷 공유기 위치이동/랜선 재연결했으나 전체영상불/장애문구뜸/대표님 핸드폰으로 확인중 언급/방문전 선연락\n\n\n핸드폰기종 삼성폰\n어플명 기가앱\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 미해당\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/공유기제거필요","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:29:46.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616142819868","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2026.05.16","계약종료일":"2029.05.15","월정료(VAT미포함)":"37,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30863040","계약번호":"51723748","서비스번호":"62487214","고객명":"임종*","상호":"임종천","VOC유형대":"변경/조회","VOC유형중":"정지","VOC유형소":"일시정지","VOC유형":"i형_정지연장 지사상담요청","해지상세":"","AS상세":"","등록내용":"010-5475-1418/임종천/일시정지/기간: 6.17-7.17/사유: 사업장을 겨울에만 운영하여 불필요/담당부서 확인후 정지됨 안내/60일 초과 고객센터 등록불가/정지처리결과 담당 연락 요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"원주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616142712864","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.12.15","계약종료일":"2028.02.29","월정료(VAT미포함)":"27,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31190024","계약번호":"52290860","서비스번호":"63601680","고객명":"광진구시설관리공*","상호":"광진구시설관리공단","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"02-2049-4558/김진용(직원)/pc웹사이트/카메라 1대 영상불/영상이 원활히 재생되고있지 않음 문구뜸/새로고침해도 증상동일/장비리셋은 어렵다함/선 연락 후 방문요청 [캠단선]\n\n핸드폰기종 해당없음\n어플명 해당없음\n인터넷이상유무 정상\n메인아이디일치여부 불일치\n통합앱고객명일치여부 해당없음\n신원확인여부 신원확인불","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:26:29.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616142419856","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-guard+(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.09.30","계약종료일":"2030.09.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31082068","계약번호":"52109898","서비스번호":"63274901","고객명":"조은*","상호":"조미란","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-7144-4338/조은채/기가앱/카메라1대 영상불/Poe허브 재결착 안내드렸으나, 선이 많아서 조작하기 어렵다고 함\nㄴ\tGiGAeyes i-special   [캠단선]\n\n핸드폰기종 갤럭시\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 비해당\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선/원격리셋불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:25:53.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616142414854","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2019.09.17","계약종료일":"2026.09.16","월정료(VAT미포함)":"110,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"161656","계약번호":"10918019","서비스번호":"10918019","고객명":"이자*","상호":"피자스쿨태장점","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"불필요","AS상세":"","등록내용":"010-5075-2103/이자영/이사로 인해 해지요청/불편사항 없음/[홈페이지] \nㄴ계약자 휴대폰이 없다고 함/부모와 같이 있음으로 해당번호로 연락 요청 \nㄴ신분증 고객센터 팩스 2026-06-16 13:48/0151801050752103/수신확인완료","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000202","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616141859826","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"GiGAeyes Basic","서비스소":"","회선방식대":"무선회선","회선방식중":"LTE Single KT","서비스개시일":"2005.01.22","계약종료일":"2027.05.15","월정료(VAT미포함)":"50,000","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30070373","계약번호":"50151602","서비스번호":"60182138","고객명":"이병*","상호":"의정부시남자단기청소년쉼터","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-5588-1318//이준형/로컬모니터 영상정상, cmsp 2.4.5에서 영상안나옴,  장치수동등록/ ddns 조회불  , 장치리셋시도 동일, 피시원격제어  확인완\n점검요청 \n\n\n핸드폰기종 미해당 \n어플명 미해당 \n인터넷이상유무 정상\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 확인","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/영상-기타/서비스번호조회불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:17:58.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616141510808","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2012.05.31","계약종료일":"2027.03.31","월정료(VAT미포함)":"60,000","접수횟수":"1","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30601520","계약번호":"51255173","서비스번호":"61538439","고객명":"장예*","상호":"새솔약국(GiGAeyes guard)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"센터방어","VOC유형":"[실패]불편사항없음","해지상세":"휴/폐업","AS상세":"","등록내용":"010-8625-7489//장예린/ 해지요청/폐업함 /불편한점:없음\nㄴ요금할인혜택거부/명의변경 및 이전장소 없음\nㄴ사업자조회 : ㅇ\nㄴ약정종료일자 : 종료됨\nㄴ철거일자 조율 필요함","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000103","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616141423804","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2020.07.23","계약종료일":"2027.03.31","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31249368","계약번호":"52416619","서비스번호":"63873789","고객명":"윤서*","상호":"윤서영님 주택","VOC유형대":"설치/철거","VOC유형중":"개통/설치","VOC유형소":"I형 상품","VOC유형":"개통/설치 일정문의/안내","해지상세":"","AS상세":"","등록내용":"010-3731-1456/윤서영/16일날 15시에 설치하러 온다고 했는데 연락이 안왔다며 설치일쩡 빠른 연락요청/sfa 설치팀 조회안됨","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"강북지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616141341798","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2026.05.10","계약종료일":"2029.05.09","월정료(VAT미포함)":"37,000","접수횟수":"0","본사":"고객서비스본부","팀":"시공품질팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30955530","계약번호":"51898353","서비스번호":"62856837","고객명":"최병*","상호":"오소리베이커리","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-9658-9682/최병준/통합앱/녹화데이터없다뜸/장비재부팅 후 동일증상/인터넷정상/ddns정상/방문전 선연락\n\n핸드폰기종 기종확인불\n어플명 통합앱\n인터넷이상유무 O\n메인아이디일치여부 O\n통합앱고객명일치여부 O\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/녹화기/HDD불량","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:15:46.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616141032786","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.11.22","계약종료일":"2026.11.21","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30652233","계약번호":"51031186","서비스번호":"61233755","고객명":"차명*","상호":"축석지앤지골프존(GiGAeyes guard)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-9982-4364/차명준/모바일 영상확인중/ 로그인불가/ 원격거부 /유선상담거부 / 담당자방문후진행요청/ 선연락후방문요청 /ddns조회불\n\n핸드폰기종-삼성용\n어플명-토탈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-일치\n신원확인여부-일치","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/영상-기타/서비스번호 조회불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:12:55.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616140740780","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2018.11.12","계약종료일":"2028.04.14","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30430362","계약번호":"51447467","서비스번호":"61898742","고객명":"이송*","상호":"이송현농장","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"추가/위치변경/설치 관련 문의/안내","해지상세":"","AS상세":"","등록내용":"010-3345-4559/이송현/카메라가 노후화되어 교체 상담요청/현재 영상질이 너무 안좋다고 언급/담당자 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000309","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616135417720","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2021.07.27","계약종료일":"2027.08.22","월정료(VAT미포함)":"30,000","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31026919","계약번호":"52030752","서비스번호":"63138177","고객명":"오영*","상호":"오영학","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-3808-0551/오일신(자녀)/기가앱 카메라 3대 영상불/영상이 원활하게재생되지않습니다. 문구뜸/재부팅 못한다고함/인터넷정상/선 연락 후 방문요청 [캠단선]\n\n핸드폰기종 갤럭시\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 X\n신원확인여부 O","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:04:26.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616135406718","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.08.26","계약종료일":"2027.08.25","월정료(VAT미포함)":"51,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30186309","계약번호":"50451974","서비스번호":"60555274","고객명":"최병*","상호":"화양물산(OCT뷰)","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS일정","VOC유형":"AS방문일정문의","해지상세":"","AS상세":"","등록내용":"010-8893-1117/승흥찬/AS 방문일정 문의/언제쯤 방문 가능한지 확인요청/방문전 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SE","담당상세":"G230004","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616134850698","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2015.04.29","계약종료일":"2026.07.31","월정료(VAT미포함)":"60,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30423998","계약번호":"50917901","서비스번호":"61101379","고객명":"김재*","상호":"김재형축사","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS불만","VOC유형":"AS 처리지연","해지상세":"","AS상세":"","등록내용":"010-3391-0465/김경회/6.15 카메라 2대 작동불로 방문접수확인됨/ 방문독","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"P000201","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616134316684","클레임구분":"해당없음","서비스대":"판매상품","서비스중":"OCT DVR(판매형-신품)","서비스소":"","회선방식대":"무회선","회선방식중":"판매상품","서비스개시일":"2018.04.16","계약종료일":"2026.09.30","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":"RAS20260616090336302"},{"상태":"미접수","지령여부":"N","고객번호":"31026838","계약번호":"52030599","서비스번호":"63137850","고객명":"심철*","상호":"해솔 노원점","VOC유형대":"변경/조회","VOC유형중":"정지","VOC유형소":"일시정지","VOC유형":"경제적사유로 정지요청","해지상세":"","AS상세":"","등록내용":"010-6341-5606/심철기/영업담당자와 협의완료하여 일시정지 진행요청/06.17~07.17/기기는 이미 텔레캅 담당자가 떼어놨다고 하시며 단말기오프방문필요없다하심/정지전산등록완료","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"G000101","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616134111674","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.08.20","계약종료일":"2027.08.19","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30565940","계약번호":"52434379","서비스번호":"63911738","고객명":"수택1동행정복지센타동*","상호":"수택1동행정복지센터","VOC유형대":"설치/철거","VOC유형중":"개통/설치","VOC유형소":"L형 상품","VOC유형":"지원요청","해지상세":"","AS상세":"","등록내용":"031-550-8497/홍은정(직원)/현시설 락장치가 내려온 상태로 올라가지 않는다고 언급/문이라도 잠기게 점검요청/주소 변경요청:경기 구리시 수택천로 16번길 78 행정복지센터/변경요청/유지전환필요","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"남양주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616132805646","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"","계약종료일":"","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30793402","계약번호":"51601347","서비스번호":"62223077","고객명":"김경*","상호":"김경미","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-4105-4956/박순란(어머니)/기가 웹사이트 영상불/현재 외부에있어 원격진행불/확인불/모바일은 보이는데 PC에서 확인이 안된다고함/로그인은 됐다고함/조작미숙으로 유선거부/방문요청/선 연락 후 방문요청 \n\n핸드폰기종 X\n어플명 X\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 X\n신원확인여부 O","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/기가웹/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:44:27.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616132409636","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.05.04","계약종료일":"2027.05.03","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31014235","계약번호":"52007416","서비스번호":"63088212","고객명":"김귀*","상호":"꾸시야","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS일정","VOC유형":"AS방문일정문의","해지상세":"","AS상세":"","등록내용":"010-2379-6706/이대규/6.16일 AS방문 후 어댑터 추가 필요하다고 재방문한다고 했었다고 함/아직 연락 없어 연락주심/빠른 방문 요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"G000302","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616131356610","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.06.27","계약종료일":"2027.06.26","월정료(VAT미포함)":"100,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30570319","계약번호":"51125467","서비스번호":"61356621","고객명":"디자인나비드(주*","상호":"디자인나비드(GiGAeyes guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이용변경불만","VOC유형":"변경처리지연","해지상세":"","AS상세":"","등록내용":"010-2870-8871/손윤오/2026-05-13일 명의변경 요청건/06.01일자 명의변경 요청했으나 06월 세금계산서 발행되어 담당자 통화요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000207","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616131342608","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"무선회선","회선방식중":"NB-IOT","서비스개시일":"2019.08.12","계약종료일":"2027.03.31","월정료(VAT미포함)":"50,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30319736","계약번호":"50703253","서비스번호":"60848171","고객명":"김효*","상호":"장군닭갈비","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"휴/폐업","AS상세":"","등록내용":"010-9675-3222/장준성(해지위임-자녀)/폐업으로 해지요청/불편사항 없음/010-9133-2950/김효정(요청자)/본인인증완료[홈페이지]\nㄴ미납금 국민 가상계좌 수납확인완료","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000204","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616130315592","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2016.10.20","계약종료일":"2027.02.28","월정료(VAT미포함)":"50,000","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31035006","계약번호":"52045545","서비스번호":"63169559","고객명":"(주)용일프린*","상호":"용일프린팅(OCT)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이용변경불만","VOC유형":"변경처리지연","해지상세":"","AS상세":"","등록내용":"010-8984-5364/강미경/[1차독촉/26.06.15.09:45-접수건 처리지연 불만제기]/리더기1대, 카메라1대 위치변경요청건 미처리로 재인입/언제 오는지 빠른 통화 후 방문 요청","처리자":"황상대","처리유형":"관제AS>>이용변경상담","처리내용":"장비위치이동설치","담당유형":"SP","담당상세":"G000307","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:08:54.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616130205590","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(NVR)","회선방식대":"무선회선","회선방식중":"LTE Single KT","서비스개시일":"2024.09.12","계약종료일":"2027.09.11","월정료(VAT미포함)":"160,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30412443","계약번호":"50893233","서비스번호":"61070971","고객명":"이인*","상호":"장인추어탕(OCT)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이용변경불만","VOC유형":"변경처리지연","해지상세":"","AS상세":"","등록내용":"010-8925-6158/이인자/방범 시설 축소 요청건 아직도 연락못받았다 함/내용 전달하겠다 안내","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000205","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616123337538","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(DVR)","회선방식대":"무선회선","회선방식중":"MVNO","서비스개시일":"2018.02.19","계약종료일":"2026.09.30","월정료(VAT미포함)":"65,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30739754","계약번호":"51503969","서비스번호":"62016125","고객명":"강진*","상호":"강진주","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-3254-1813/강진주/모바일영상확인중/ 카메라 3대중 1대영상불/ 장치리셋후 동일증상 / 점검요청[캠단선]\n\n핸드폰기종-삼성용\n어플명-기가이즈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-해당없음\n신원확인여부-일치","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선/원격리셋불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:37:18.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616122943528","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.11.05","계약종료일":"2026.11.04","월정료(VAT미포함)":"37,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31164217","계약번호":"52235714","서비스번호":"63479357","고객명":"박인*","상호":"산정호수로뎀하우스","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-5330-0401/이인호/로컬모니터 사용중/ 카메라 3대중 1대영상불/ 위치확인불가 장치리셋불가/ 점검요청[캠단선]/ddns정상 \n\n\n\n핸드폰기종-해당없음\n어플명-해당없음\n인터넷이상유무-해당없음\n메인아이디일치여부-해당없음\n통합앱고객명일치여부-해당없음\n신원확인여부-완료","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"처리완료/영상/카메라/카메라리셋","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:41:29.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616122457518","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.05.23","계약종료일":"2028.05.22","월정료(VAT미포함)":"40,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31009396","계약번호":"51998582","서비스번호":"63069552","고객명":"성진물류창*","상호":"성진물류창고","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-8898-2060/전인경/영상이 원활히 재생되지 않습니다, 장치리셋시도 동일/ \n잦은 고장으로  해지고려언급, 빠른방문요청\n\n\n핸드폰기종 갤럭시 기종 확인불\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 확인","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선/원격리셋불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:29:55.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616121041496","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.06.13","계약종료일":"2027.06.12","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30623458","계약번호":"51163271","서비스번호":"61407986","고객명":"송광*","상호":"다온자산관리제1팀","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-8075-7117/설관정(입주민)/로컬모니터에서 1번채널 카메라가 너무 밝게 보여서 사물식별어려움 , 밝기 조절요청/ \nddns 신호모두 정상\n\n핸드폰기종 미해당\n어플명 미해당\n인터넷이상유무 미해당\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 불","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/화질불량","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:33:01.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616120234482","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2019.12.26","계약종료일":"2026.09.30","월정료(VAT미포함)":"49,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31228972","계약번호":"52371113","서비스번호":"63778404","고객명":"이영*","상호":"이영덕가정집","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"요금조정","VOC유형":"과오납 감액/환급요청","해지상세":"","AS상세":"","등록내용":"010-7620-0860/이영덕/05월 과납입금된 4,157원 환급요청/환급내역 금액 확인불/담당자 통화요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"원주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616115855474","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2026.02.11","계약종료일":"2029.02.10","월정료(VAT미포함)":"35,000","접수횟수":"0","본사":"영업채널본부","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31026274","계약번호":"52029638","서비스번호":"63135796","고객명":"정기*","상호":"쟁이","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이전","VOC유형":"이전설치","해지상세":"","AS상세":"","등록내용":"010-5440-1512/정기봉/이전설치 요청/주소지 : 서울특별시 중구 신당동 777 광희시장 상가 1층 47호 48호","처리자":"백석현","처리유형":"서비스>>기타","처리내용":"","담당유형":"SP","담당상세":"G000103","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 15:06:19.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616115843472","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.08.13","계약종료일":"2027.08.12","월정료(VAT미포함)":"35,000","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30141272","계약번호":"51210594","서비스번호":"61477641","고객명":"젤라블루코리*","상호":"젤라블루코리아(사무실)(OCT)","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS불만","VOC유형":"AS 처리지연","해지상세":"","AS상세":"","등록내용":"010-2487-1959/김현기/출입통제관련 어제 수리받기로 하였는데 연락도 없고 방문도 없었다며 빠른 연락 및 방문요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"G000603","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616115820468","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2014.04.04","계약종료일":"2027.02.01","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"","관련AS":"RAS20260612164215815"},{"상태":"처리완료","지령여부":"N","고객번호":"30979435","계약번호":"51942972","서비스번호":"62950535","고객명":"박지*","상호":"니즈필라테스","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-3894-8163/김종신/토탈앱 전체영상불/ddns불량/재부팅해도 동일/인터넷정상/선 연락 후 방문요청 \n\n핸드폰기종 아이폰17\n어플명 토탈서비스앱\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 O\n신원확인여부 O","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:28:00.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616115740466","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.03.04","계약종료일":"2029.03.03","월정료(VAT미포함)":"42,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30792070","계약번호":"51598905","서비스번호":"62217655","고객명":"박소*","상호":"상가주택","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-4458-6211/박소현/기존앱/전체영상불/인터넷정상/ddns영상,웹포트불량/장비리셋해도 증상동일/통합앱전환필요안내/방문시 더불어 조치요청/선 연락 후 방문요청\n\n핸드폰기종 갤럭시상세기종탐색불\n어플명 스마트아이즈\n인터넷이상유무 정상\n메인아이디일치여부 해당없음\n통합앱고객명일치여부 해당없음\n신원확인여부 신원확인완료","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:27:46.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616115712462","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(DVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2022.04.28","계약종료일":"2027.02.28","월정료(VAT미포함)":"25,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31245488","계약번호":"52405668","서비스번호":"63852301","고객명":"정태*","상호":"정태영가정집","VOC유형대":"변경/조회","VOC유형중":"고객정보","VOC유형소":"정보변경","VOC유형":"주소정정","해지상세":"","AS상세":"","등록내용":"010-2862-0645/정태영/주소 정정 요청/강원 횡성군 둔내면 삽교리 35-8/도로명은 없는 주소이나 지번은 있다고 함","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000202","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616115219442","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2026.04.17","계약종료일":"2029.04.16","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"30942230","계약번호":"51873961","서비스번호":"62803996","고객명":"장진*","상호":"장진희","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS일정","VOC유형":"AS방문일정문의","해지상세":"","AS상세":"","등록내용":"010-4814-2535/김봉규/카메라 2대 영상불로 인해 기사가 방문하여 점검을 하였는데 본인들을 고칠수가 없고 텔레캅 안에서 영상을 볼수 없도록 막아놓아다고 안내를 받았다고함/그동안 카메라 8대 영상을 잘보고 있었는데 왜 갑자기 2대만 안보이게 막았는지 사유 확인요청","처리자":"엠지브이(관리자)","처리유형":">>","처리내용":"","담당유형":"협력사","담당상세":"G09981","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616115037438","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.10.06","계약종료일":"2026.10.05","월정료(VAT미포함)":"72,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30883605","계약번호":"51764942","서비스번호":"62570243","고객명":"손경*","상호":"손경국가정집","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"요금비쌈","해지상세":"불필요","AS상세":"","등록내용":"010-3289-4153/손경국/불필요 해지요청/불편사항 요금비쌈/약정종료된 것으로 알고 있다고 하심/현시설만해지[홈페이지]","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000204","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616114931428","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"GiGAeyes Basic","서비스소":"","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.05.31","계약종료일":"2027.04.30","월정료(VAT미포함)":"80,000","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31188913","계약번호":"52288386","서비스번호":"63596144","고객명":"장재*","상호":"삼수1길39주택(태백)","VOC유형대":"변경/조회","VOC유형중":"정지","VOC유형소":"일시정지","VOC유형":"L형_정지연장 지사상담요청","해지상세":"","AS상세":"","등록내용":"010-3009-9911/장재석/장기병원입원중으로 일시정지연장 3개월요청함/ 6.18~9.18일까지 /  30일초과로 고객센터 정지연장 등록불가 정지연장 처리결과 담당자 연락요청 /전산미등록","처리자":"정준우","처리유형":"서비스>>기타","처리내용":"일시정지 확인완료","담당유형":"지사","담당상세":"강릉지사","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 14:23:01.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616114101392","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.08.27","계약종료일":"2030.08.26","월정료(VAT미포함)":"100,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31035715","계약번호":"51292721","서비스번호":"61592858","고객명":"이재*","상호":"장락교회(view)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"해지처리불만","VOC유형":"해지상담후 처리지연","해지상세":"","AS상세":"","등록내용":"010-5050-3769/이재희/6.9일 해지접수건 처리지연, 철거연락지연/6.16일 철거방문 안내받았으나 연락조차없어 다른 업무를 보지못하고 있음/철거관련 빠른연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000209","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616114009384","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2020.12.09","계약종료일":"2026.09.30","월정료(VAT미포함)":"50,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31131806","계약번호":"52170261","서비스번호":"63349118","고객명":"이은*","상호":"이디야커피 을지로중앙점","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"청구 미/수납 불만","VOC유형":"요청처리 지연","해지상세":"","AS상세":"","등록내용":"010-4613-9641/이은미/6월10일접수 2026년4월22일 인터넷 경합해지되어 결합할인 못받음 요금환불요/확인후 연락주신다고 했는데 아직 연락없음/빠른 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000402","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616113217350","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.01.13","계약종료일":"2028.01.12","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30158395","계약번호":"50386085","서비스번호":"60473078","고객명":"최창*","상호":"꿈의숲교회(대한예수교장로회)(OCT)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-2559-7634/우수임/cms프로그램 설치요청/fns정보확인불가로 진행요청/ddns조회불/\n\n핸드폰기종-해당없음\n어플명-해당없음\n인터넷이상유무-정상\n메인아이디일치여부-해당없음\n통합앱고객명일치여부-해당없음\n신원확인여부-확인불가","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/녹화기/원격불가장비(아이디스)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 13:02:01.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616113151346","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(NVR)","회선방식대":"무선회선","회선방식중":"LTE Single KT","서비스개시일":"2014.08.27","계약종료일":"2026.09.30","월정료(VAT미포함)":"128,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31005564","계약번호":"51990788","서비스번호":"63053833","고객명":"최영*","상호":"렌탈플랜(GiGAeyes guard)","VOC유형대":"출동","VOC유형중":"출동요청","VOC유형소":"문의/일정","VOC유형":"일정문의/안내","해지상세":"","AS상세":"","등록내용":"010-8832-1227/최영우/새벽 4:50분경에 장비교체하였다고 문자를 받았다고함/ac단선으로 신호 발생되어 출동한부분으로 확인됨안내/사업장에 출입을 해서 장비교체하였다고 하는데 어떤 장비교체를 하였는지 상세상담요청/빠른연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"G000204","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616113044342","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.05.30","계약종료일":"2027.05.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"출동서비스팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31196665","계약번호":"51905032","서비스번호":"62871193","고객명":"석진*","상호":"온정역","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-6534-5623/석진연/ 카메라1대 위치 변경요/ 비용발생여부 안내함/","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000103","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616112656320","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2023.12.05","계약종료일":"2026.12.04","월정료(VAT미포함)":"37,000","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31260226","계약번호":"52342809","서비스번호":"63717724","고객명":"류동*","상호":"행정사 사무소 민형","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"상품전환","해지상세":"","AS상세":"","등록내용":"010-9223-0126/류동훈/외부에서 앱을 통해서 전등제어를 할수 있는 상품 상담요청/토탈앱에서 영상보안에 마이크가 있는데 외부에 스피커를 설치를 해서 같이 연동하여 사용할수 있는지 상담요청/빠른연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000207","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616111405270","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.12.11","계약종료일":"2028.12.10","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31166515","계약번호":"52243339","서비스번호":"63494972","고객명":"진정*","상호":"김밥 스탠다드","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이용변경불만","VOC유형":"변경처리지연","해지상세":"","AS상세":"","등록내용":"010-6237-7112/진정일(양도인)명의 변경 요청 재인입 담당자 빠른 연락 요청/법인 > 법인","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000401","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616110455240","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.06.04","계약종료일":"2028.06.03","월정료(VAT미포함)":"40,000","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30529081","계약번호":"51693813","서비스번호":"62424699","고객명":"고양도시관리공*","상호":"백석체육센터부설주차장(GiGAeyes guard)","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"청구서/세금계산서","VOC유형":"청구요금문의/안내","해지상세":"","AS상세":"","등록내용":"010-7242-3323/김지한(채용문화2처)/월정료문의/자신의 소속부서 시설이 아닌 61590509 시설이 KT청구서상 자신의 소속부서쪽으로 청구되었다며 원복요청\n-현시설만 문의자의 담당관리시설로, 매월 KTT쪽에서는 198,000만 납부하셨다함/이번달 청구서상 KTT청구요금 374,000청구되었고, 이는  현시설 및 61590509(고양체육관부출입구지상주차장)시설이 문의자의 소속부서(채용문화2처)로 포함되어 청구된 것으로 보인다심/원복요청/\n- 해당시설 61590509은 채용문화 1처 소속건으로 031-930-1033/김충열 담당자 부서의 건이라심(해당시설 6.15 상담이력상, 해당시설 요금 당월KT청구상 미포함되어 있다는 문의이력 확인됨)\n-시간양해-수긍/유선연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"고양지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616110059224","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.10.20","계약종료일":"2027.10.19","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31006813","계약번호":"51995457","서비스번호":"63062651","고객명":"유길*","상호":"유길태","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-9568-3550/유길태/기가아이즈앱 로그인불가.\n로그인문제로 최근에 다녀갔는데 다시 로그인이 안됨.\n고령 조작미숙 통화중 앱 실행불가, 유선안내 진행불\n로그인 도움요청\n\n핸드폰기종 미확인\n어플명 기가아이즈 \n인터넷이상유무 미확인\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 확인","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/기가앱/조작미숙/로그인불","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 11:06:06.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616104912202","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.06.19","계약종료일":"2027.06.18","월정료(VAT미포함)":"17,000","접수횟수":"1","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31200599","계약번호":"52311577","서비스번호":"63647768","고객명":"송*","상호":"송설","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-3063-9191/송설/모바일 전체영상불/ 장치리셋후 동일증상/ 점검요청 \n\n\n\n핸드폰기종-삼성용\n어플명-기가아이즈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-해당없음\n신원확인여부-일치","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:53:57.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616104730198","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.10.17","계약종료일":"2028.10.16","월정료(VAT미포함)":"27,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31200633","계약번호":"52311637","서비스번호":"63647911","고객명":"김정*","상호":"김정재빌딩i-view(ktt)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-3667-8339/김정재/기가앱(갤럭시) 전체 영상불/POE 허브 재결착 안내드렸으나, 조작 미숙 현장 담당자 방문 요청/\n\n핸드폰기종 갤럭시\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 비해당\n신원확인여부 O","처리자":"박영운","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:44:34.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616104326186","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-view(2505)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.10.17","계약종료일":"2028.10.16","월정료(VAT미포함)":"27,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30776330","계약번호":"51571768","서비스번호":"62157995","고객명":"정숙*","상호":"정숙희","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-6774-0475/정숙희/기가앱/전체영상불/인터넷정상/영상이 원활히 재생되고있지 않음 문구뜸/조작미숙으로 장비리셋,휴대폰재부팅불가/선 연락 후 방문요청\n\n핸드폰기종 갤럭시상세기종탐색불\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 일치\n통합앱고객명일치여부 해당없음\n신원확인여부 신원확인완료","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/기가앱/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:45:39.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616104251184","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.03.11","계약종료일":"2027.03.10","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31031294","계약번호":"52038878","서비스번호":"63155160","고객명":"(주)와이에이치레저개*","상호":"클럽모우cc(클럽하우스,주차장)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-3126-7774/허원석/카메라 추가, 위치변경요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000208","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616104126178","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2024.09.19","계약종료일":"2029.09.18","월정료(VAT미포함)":"200,000","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31252032","계약번호":"52421525","서비스번호":"63884450","고객명":"최성*","상호":"태능감자탕 휘경점","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-6585-9075/최성복/pc원격/모바일영상확인중/포스기에cmsp2.4설치후 백업진행중 프로그램 강제종료확인됨/진행불가/ 담당자 방문후 진행요청/ 로컬모니터 사용무/usb준비안내/ddns정상/백업 6.15오후3시 ~ 오후 6시까지 요청/ 선연락후 방문요청 \n\n핸드폰기종-삼성용\n어플명-토탈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-일치\n신원확인여부-일치","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/녹화기/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:41:41.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616104025172","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2026.05.14","계약종료일":"2029.05.13","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30225966","계약번호":"50532828","서비스번호":"60655108","고객명":"이응*","상호":"생큐마트(NVR뷰)","VOC유형대":"설치/철거","VOC유형중":"철거","VOC유형소":"L형 상품","VOC유형":"철거요청","해지상세":"","AS상세":"","등록내용":"010-2970-4351/이응수/해지미철거상태로 녹화기 전원 지속 켜져있는상태-텔레캅 장비가 맞다면 텔레캅 해지철거 지연으로 전원켜져있어 전기세발생됨에 대한 요금 같이 달라고하시며 해지철거일정 같이 확인필요 담당 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"중앙지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616103250158","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"kt OCT 뷰(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2015.10.07","계약종료일":"2019.10.06","월정료(VAT미포함)":"42,000","접수횟수":"0","본사":"고객서비스본부","팀":"시공품질팀","P/N/G":"N3","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"31071489","계약번호":"52097420","서비스번호":"63257954","고객명":"이효*","상호":"제이앤비(GiGAeyes guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"영상장비 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-5646-8270/카메라 2개 추가설치 상담요청/기존 카메라 2대중 1개는  위치변경 상담요청","처리자":"박민준","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000305","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616102245130","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.11.29","계약종료일":"2027.11.28","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"영상보안사업팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"30759947","계약번호":"51541843","서비스번호":"62096784","고객명":"강석원*","상호":"편안한 재활의학과의원(GiGAeyes guard)","VOC유형대":"해지","VOC유형중":"해지징후","VOC유형소":"징후처리불만","VOC유형":"징후처리지연","해지상세":"","AS상세":"","등록내용":"010-5580-4906/박휘호/6.15일 재인입/약정종료일 문의 및 재약정 가능여부 상담요청","처리자":"고승남","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000201","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616102053128","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.02.15","계약종료일":"2027.02.14","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31219152","계약번호":"52348535","서비스번호":"63731220","고객명":"오인*","상호":"더미소양양","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-5328-7000/권혁용/모바일 및로컬 모니터 사용중/ 카메라 3대중 1대영상불/ 외부에계셔서 장치리셋불가[캠단선]/ddns정상/\n\n\n핸드폰기종-삼성용\n어플명-토탈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-일치\n신원확인여부-일치","처리자":"박영운","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:19:21.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616101209100","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.12.30","계약종료일":"2028.12.29","월정료(VAT미포함)":"35,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강릉지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"결재요청","지령여부":"N","고객번호":"31033299","계약번호":"51686136","서비스번호":"62407908","고객명":"김무*","상호":"카페류","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"해지처리불만","VOC유형":"해지요청 처리지연","해지상세":"","AS상세":"","등록내용":"010-2215-0201/김무성/ 6.8 폐업으로 해지요청건 해지지연불만  / 기기는  6.15일에 철거완료 언급/ 빠른해지처리및 해지정산금 관련 통화요청","처리자":"엄태일","처리유형":"서비스>>요금상담","처리내용":"사무실 전산처리이관","담당유형":"SP","담당상세":"G000310","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616100853092","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.10.05","계약종료일":"2026.09.30","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30331339","계약번호":"50725561","서비스번호":"60873823","고객명":"주)타이거인스트루먼*","상호":"주)타이거인스트루먼트","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"이전","VOC유형":"이전설치","해지상세":"","AS상세":"","등록내용":"010-3447-8114 /추민호 / 이전 설치 요청 /[홈페이지]","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000204","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616100750086","클레임구분":"해당없음","서비스대":"판매상품","서비스중":"OCT DVR(판매형-신품)","서비스소":"","회선방식대":"무회선","회선방식중":"판매상품","서비스개시일":"2017.07.24","계약종료일":"2026.10.31","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30331339","계약번호":"52051857","서비스번호":"63182390","고객명":"추민*","상호":"타이거인스트루먼트","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"휴/폐업","AS상세":"","등록내용":"010-3447-8114 /추민호 / 폐업으로 인한 하재요청 / 불편사항 :없음 / 현시설만 해지요청 / [홈페이지]","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000205","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616100651080","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.10.07","계약종료일":"2027.10.06","월정료(VAT미포함)":"0","접수횟수":"1","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"30828316","계약번호":"51661247","서비스번호":"62354312","고객명":"진민*","상호":"리빙킹2호점(백석)(GiGAeyes guard)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"해지처리불만","VOC유형":"해지요청 처리지연","해지상세":"","AS상세":"","등록내용":"010-5297-8474/원유순(해지위임-배우자)/6.9일 해지 voc접수건/연락 온건지 안온건지 잘 모르겠다고 함/해지관련 배우자에게 위임한다고 하며 빠른연락 요청/010-3695-6740/진민곤(요청자)/본인인증완료/[홈페이지]","처리자":"정양진","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000503","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616100037052","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.08.29","계약종료일":"2027.08.28","월정료(VAT미포함)":"0","접수횟수":"0","본사":"","팀":"","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"의정부지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31254581","계약번호":"52427553","서비스번호":"63896873","고객명":"의료법인창민의료재*","상호":"판매_의료법인창민의료재단","VOC유형대":"설치/철거","VOC유형중":"개통/설치","VOC유형소":"L형 상품","VOC유형":"지원요청","해지상세":"","AS상세":"","등록내용":"043-640-6104/김병규/6.15일 접수건/AS접수 취소요청/해결 되었다고 연락할 필요 없다고 함","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"원주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616095627030","클레임구분":"해당없음","서비스대":"판매상품","서비스중":"OCT NVR(판매형-신품)","서비스소":"","회선방식대":"무회선","회선방식중":"판매상품","서비스개시일":"","계약종료일":"","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31199851","계약번호":"52310444","서비스번호":"63645591","고객명":"박현*","상호":"센티드(OCT)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-3801-3211/박현수/어제부터 토탈앱 사이트접속실패, 장치리셋이미시도 동일/ ddns신호모두 불량\n\n핸드폰기종 갤럭시 기종 확인불\n어플명 토탈앱\n인터넷이상유무 정상\n메인아이디일치여부 일치 \n통합앱고객명일치여부 일치 \n신원확인여부 확인","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:48:23.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616094629972","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(DVR)","회선방식대":"초고속인터넷","회선방식중":"메인","서비스개시일":"2025.10.13","계약종료일":"2028.10.12","월정료(VAT미포함)":"55,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30685340","계약번호":"51405806","서비스번호":"61810954","고객명":"우소*","상호":"(구립)중곡하나어린이집(GiGAeyes guard)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-8791-1831/우소희/모니터/기가아이즈 로고만 확인됨/통합앱/사이트 접속 실패 문구/장비재부팅 어려움/어린이집이라 빠른 연락요청/인터넷정상/ddns전체신호불량/빠른 방문요청\n\n핸드폰기종 기종확인불\n어플명 통합앱\n인터넷이상유무 O\n메인아이디일치여부 O\n통합앱고객명일치여부 O\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:44:45.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616094248960","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.05.31","계약종료일":"2027.02.28","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30855558","계약번호":"51710356","서비스번호":"62459345","고객명":"이영*","상호":"우리홈마트(GiGAeyes guard)","VOC유형대":"설치/철거","VOC유형중":"철거","VOC유형소":"L형 상품","VOC유형":"철거요청","해지상세":"","AS상세":"","등록내용":"010-6705-3040/이영재/철거요청/담당자가 5월중 철거방문하기로 하였다고 함/현재까지 미방문으로 일정관련 빠른 연락요청","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"강북지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616094239958","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2022.11.18","계약종료일":"2026.10.31","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"시공품질팀","P/N/G":"N3","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"강북지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31098944","계약번호":"52126774","서비스번호":"63291777","고객명":"한석*","상호":"한석현","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-8704-4270/한석현/피시웹 및 모바일앱 동일/ 전체 캠 중 4대 영상이 원활히 재생되지 않습니다 문구 보임 / 장치리셋이미시도 동일 \n[캠단선] 점검요청 \n\n핸드폰기종 미확인\n어플명 기가아이즈 \n인터넷이상유무 정상\n메인아이디일치여부 미해당\n통합앱고객명일치여부 미해당\n신원확인여부 확인","처리자":"정병훈","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:44:26.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616094047950","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-special","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2019.10.19","계약종료일":"2026.10.18","월정료(VAT미포함)":"140,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31208137","계약번호":"52326236","서비스번호":"63680763","고객명":"최현*","상호":"신백코리아태권도","VOC유형대":"AS","VOC유형중":"공통AS","VOC유형소":"AS불만","VOC유형":"AS 처리후불만","해지상세":"","AS상세":"동일고장반복","등록내용":"010-8410-1475/최현용 / 6월 15일 카메라 교체 진행 / 동하게 영상불 확인  /  배선문제로 재가설 안내 받았다고 언급 / 재연락 주기로 하였는데 연락이 없다고 하심","처리자":"백경호","처리유형":"서비스>>요금상담","처리내용":"","담당유형":"SG","담당상세":"P000203","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 10:08:46.0","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616094010946","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.11.17","계약종료일":"2028.11.16","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"N2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":"RAS20260612173335844"},{"상태":"처리완료","지령여부":"N","고객번호":"31081719","계약번호":"52109549","서비스번호":"63274552","고객명":"김영*","상호":"양구 (미소펜션)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-8545-6978/최혜숙/기가앱/카메라1대 일부영상불/2번 cam/인터넷정상/장비재부팅 후 동일증상/무조건 당일 방문해달라 불만/최대한 빠른 방문요청/캠단선\n\n\n핸드폰기종 삼성폰\n어플명 기가앱\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 미해당\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선/원격리셋불가","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:37:36.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616093628940","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2017.11.22","계약종료일":"2026.11.20","월정료(VAT미포함)":"45,125","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"31191286","계약번호":"52205537","서비스번호":"63420571","고객명":"김혜*","상호":"뼈탑","VOC유형대":"청구 미/수납","VOC유형중":"요금","VOC유형소":"미납","VOC유형":"미납사실 부인","해지상세":"","AS상세":"","등록내용":"010-3721-7333/김혜연/매장 미운영 일시정지요청/미납확인/392,210원 납부후 정지 접수 가능안내/04.30 정지해제 됨 안내/3~4월 분 청구 사유 확인 요청","처리자":"김이슬","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"남양주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616093315923","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2025.03.31","계약종료일":"2028.08.27","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"남양주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"31245661","계약번호":"52240612","서비스번호":"63490729","고객명":"김현*","상호":"멍멍스테이","VOC유형대":"변경/조회","VOC유형중":"정지","VOC유형소":"일시정지","VOC유형":"이전/설치변경에 의한 정지요청","해지상세":"","AS상세":"","등록내용":"010-5479-7508/김현중/화재로인한 일시정지요청/06.17~08.16 /장비관련 직원이 어제 다녀갔다고함","처리자":"","처리유형":">>","처리내용":"","담당유형":"SG","담당상세":"P000209","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616092942907","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt GiGAeyes view+(NVR)","회선방식대":"무회선","회선방식중":"로컬운영","서비스개시일":"2025.06.05","계약종료일":"2028.06.04","월정료(VAT미포함)":"140,000","접수횟수":"0","본사":"","팀":"","P/N/G":"","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"31026249","계약번호":"52029615","서비스번호":"63135743","고객명":"우용*","상호":"뉴발란스키즈춘천점(GiGAeyes guard)","VOC유형대":"변경/조회","VOC유형중":"이용변경","VOC유형소":"설치변경","VOC유형":"감지기 추가/위치변경/설치","해지상세":"","AS상세":"","등록내용":"010-2334-2599/우용석/2층 창고문 센서 이동/안녕하세요. 16일 오전에 매장2층 창고문 위치를 바꾸게 되어서 문과 연결된 센서를 이동해야합니다.오전중으로 공사가 끝나서 오후에라도 센서 이동 설치가 가능한지 문의드립니다./[고객의소리]","처리자":"안상현","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000206","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616092822905","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.08.30","계약종료일":"2027.08.29","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"P2","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30065395","계약번호":"52420316","서비스번호":"63881837","고객명":"이귀*","상호":"이귀만가정집(판매)","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_L형영상","해지상세":"","AS상세":"","등록내용":"010-8796-2385/이귀만/로컬모니터 카메라 순서 변경요청/고객이 연결되어있는 선을 바꿔서 해보려고했지만 조작미숙으로 진행불/방문요청/선 연락 후 방문요청/비용안내 \n\n\n핸드폰기종 X\n어플명 X\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 X\n신원확인여부 O","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/네트워크/네트워크불(포트불량)","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:27:20.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616092425887","클레임구분":"해당없음","서비스대":"판매상품","서비스중":"OCT NVR(판매형-신품)","서비스소":"","회선방식대":"무회선","회선방식중":"판매상품","서비스개시일":"2026.06.08","계약종료일":"2027.06.14","월정료(VAT미포함)":"0","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"31087329","계약번호":"52115159","서비스번호":"63280162","고객명":"김경*","상호":"김경순","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-6788-2376/김경순/ 모바일 전체영상불/야간에 적외선 불빛안들어옴/ 조작미숙으로 장치리셋불가/ 점검요청 \n\n\n\n핸드폰기종-삼성용\n어플명-기가아이즈앱\n인터넷이상유무-정상\n메인아이디일치여부-일치\n통합앱고객명일치여부-해당없음\n신원확인여부-일치","처리자":"이재은","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/카메라/CAM단선","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:24:01.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616092238875","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"KT단독상품","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2018.12.13","계약종료일":"2027.01.11","월정료(VAT미포함)":"37,500","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30865959","계약번호":"51420466","서비스번호":"61841594","고객명":"르메이에르종로타운 관리*","상호":"르메이에르종로타운  관리단","VOC유형대":"해지","VOC유형중":"해지징후","VOC유형소":"지사방어","VOC유형":"약정종료일문의","해지상세":"","AS상세":"","등록내용":"010-3768-8949/윤우섭/약정종료일문의/사유:재약정및 혜택확인요청 [콜백]","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000401","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(CALLBACK)","RAS ID":"","접수번호":"VOC20260616092100867","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-special","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.06.25","계약종료일":"2026.06.24","월정료(VAT미포함)":"1,624,000","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30969364","계약번호":"51771321","서비스번호":"62582294","고객명":"오유*","상호":"오에스디에스(GiGAeyes guard)","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"기타","해지상세":"휴/폐업","AS상세":"","등록내용":"010-5157-0911/오유선/해지요청/사유_ 폐업/6월20일자로 해지요청/서번63208465포함","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000203","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616092005862","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(DVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.03.17","계약종료일":"2027.02.28","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"서대문지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30519688","계약번호":"51086490","서비스번호":"61306423","고객명":"송병*","상호":"송병갑창고(OCT)","VOC유형대":"설치/철거","VOC유형중":"철거","VOC유형소":"L형 상품","VOC유형":"철거요청","해지상세":"","AS상세":"","등록내용":"010-4813-2444/송병갑/철거요청/해지처리 문의/해지완료됨 안내","처리자":"","처리유형":">>","처리내용":"","담당유형":"지사","담당상세":"원주지사","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616091815858","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"ktt OCT 가드(DVR)","회선방식대":"초고속인터넷","회선방식중":"메인","서비스개시일":"2019.04.20","계약종료일":"2026.11.30","월정료(VAT미포함)":"50,000","접수횟수":"0","본사":"고객서비스본부","팀":"시공품질팀","P/N/G":"N3","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"미접수","지령여부":"N","고객번호":"30729564","계약번호":"51483776","서비스번호":"61975232","고객명":"김병*","상호":"주)포이닉스","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"","AS상세":"","등록내용":".","처리자":"","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"P000201","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"스마트BSS","RAS ID":"","접수번호":"BSS20260616091144834","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2021.10.01","계약종료일":"2026.09.30","월정료(VAT미포함)":"87,000","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강원본부","관리지사":"원주지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30930066","계약번호":"51850466","서비스번호":"62754138","고객명":"주정*","상호":"민들레","VOC유형대":"업무협조","VOC유형중":"센터호전환","VOC유형소":"센터간","VOC유형":"2선 기술지원_i형영상","해지상세":"","AS상세":"","등록내용":"010-6374-3229/주정희/기가앱 로그인불/유선으로 안내하려했으나 유선거부/방문요청/방문해서 로그인요청/영상을안본지 너무오래됐다고하시며 불만/유선거부/무조건 방문요청/선 연락 후 방문요청 \n\n핸드폰기종 기종확인불\n어플명 기가아이즈\n인터넷이상유무 정상\n메인아이디일치여부 O\n통합앱고객명일치여부 X\n신원확인여부 O","처리자":"권진수","처리유형":"서비스>>기타","처리내용":"현장AS이첩/영상/기기앱/조작미숙","담당유형":"본사","담당상세":"고객서비스본부","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:07:59.0","등록경로":"고객센터(OUTBOUND)","RAS ID":"","접수번호":"VOC20260616090715820","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes i-slim (ktt)(2210)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2023.08.21","계약종료일":"2026.08.20","월정료(VAT미포함)":"17,000","접수횟수":"0","본사":"고객서비스본부","팀":"운영혁신팀","P/N/G":"I","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"중앙지사","방문활동 완료여부":"해당없음","관련AS":""},{"상태":"접수","지령여부":"N","고객번호":"31019357","계약번호":"52016607","서비스번호":"63108381","고객명":"박광*","상호":"크린토피아코인워시운정해솔마을점","VOC유형대":"해지","VOC유형중":"해지징후","VOC유형소":"지사방어","VOC유형":"약정종료일문의","해지상세":"","AS상세":"","등록내용":"010-5519-5900/박광일/약정종료일 문의 요청/사유 여쭸으나 없다고 하심","처리자":"박민준","처리유형":">>","처리내용":"","담당유형":"SP","담당상세":"G000305","접수일시":"2026-06-16","처리완료일시":"","결재일자":"","등록경로":"고객센터(INBOUND)","RAS ID":"","접수번호":"VOC20260616090417814","클레임구분":"해당없음","서비스대":"기본서비스","서비스중":"텔레캅아이","서비스소":"GiGAeyes guard+(NVR)","회선방식대":"초고속인터넷","회선방식중":"TCP-IP(All-IoT)","서비스개시일":"2024.07.18","계약종료일":"2027.07.17","월정료(VAT미포함)":"0","접수횟수":"0","본사":"영업채널본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"","관련AS":""},{"상태":"처리완료","지령여부":"N","고객번호":"30808758","계약번호":"51630352","서비스번호":"62286950","고객명":"이시*","상호":"오늘떡볶이해","VOC유형대":"해지","VOC유형중":"해지요청","VOC유형소":"지사방어","VOC유형":"불편사항없음","해지상세":"","AS상세":"","등록내용":"해지처리요청","처리자":"박희준","처리유형":"해지처리>>휴/폐업","처리내용":"","담당유형":"SP","담당상세":"G000307","접수일시":"2026-06-16","처리완료일시":"2026-06-16","결재일자":"2026-06-16 09:35:29.0","등록경로":"스마트BSS","RAS ID":"","접수번호":"BSS20260616084951812","클레임구분":"해당없음","서비스대":"부가서비스","서비스중":"ID플러스 추가","서비스소":"","회선방식대":"","회선방식중":"","서비스개시일":"2022.06.24","계약종료일":"2026.06.23","월정료(VAT미포함)":"0","접수횟수":"0","본사":"마케팅본부","팀":"리텐션팀","P/N/G":"G","4대지악유무":"N","관리본부":"강북/강원본부","관리지사":"고양지사","방문활동 완료여부":"해당없음","관련AS":""}];
+
+// ═══ STATE ═══
+let ALL=[], FAC={}, filtered=[], sortKey='접수일시', sortDir=-1, pg=1, pgSz=15;
+let charts={}, matchFilter='all', facLoaded=false;
+
+// ═══ CONSTANTS ═══
+const ST_CLS={'미접수':'b-o','접수':'b-b','처리중':'b-p','처리완료':'b-g','결재요청':'b-r'};
+const DT_CLS={'SP':'b-b','SE':'b-t','SG':'b-g','본사':'b-p','지사':'b-o','협력사':'b-gr'};
+const VC_CLS={'업무협조':'b-b','AS':'b-t','변경/조회':'b-gr','청구 미/수납':'b-r','해지':'b-o','설치/철거':'b-y','출동':'b-p'};
+const CS_CLS={'유지':'b-g','명변유지':'b-t','일시정지':'b-stop','청구설변':'b-o','일반해지':'b-term','명변해지':'b-term','전출해지':'b-term','청약등록':'b-b','청약반려':'b-gr'};
+const CLR=['#1a56db','#e07b20','#dc2626','#16a34a','#7c3aed','#0891b2','#9ca3af','#f59e0b'];
+
+// ═══ INIT ═══
+window.onload=()=>{ setVOC(EVOC); renderTech(); };
+
+// ═══ DATA ═══
+function setVOC(data){
+  ALL=data.map((r,i)=>({...r,_idx:i+1,_matchType:'',_bizZone:'',_techZone:'',_tel:'',_cStatus:'',_cStatusM:'',_sStatusM:'',_stopDate:'',_stopEnd:'',_termDate:'',_mgr:'',_mgrBranch:'',_mgrStaff:'',_salesName:'',_salesTel:'',_facAddr:'',_fee:''}));
+  buildSels(); applyFilter(); renderDash();
+}
+
+function buildSels(){
+  const vtypes=[...new Set(ALL.map(r=>r['VOC유형대']).filter(Boolean))].sort();
+  const sel=document.getElementById('f_vt');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">전체</option>'+vtypes.map(v=>`<option>${v}</option>`).join('');
+  sel.value=cur;
+}
+
+// ═══ FAC LOAD - 4단계 자동 매칭 ═══
+function loadFAC(e){
+  const file=e.target.files[0]; if(!file) return;
+  document.getElementById('facPill').textContent='⏳ 시설파일 분석중...';
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const text=ev.target.result;
+      const lines=text.split('\n');
+      const rawHdr=lines[0];
+      const headers=parseCsv(rawHdr);
+      
+      // 인덱스 매핑
+      const fi={
+        svc:headers.indexOf('서비스번호'),
+        cno:headers.indexOf('계약번호'),
+        cust:headers.indexOf('고객번호'),
+        name:headers.indexOf('상호'),
+        bizZone:headers.indexOf('영업구역정보'),
+        techZone:headers.indexOf('기술구역정보'),
+        tel1:headers.indexOf('접속전화번호'),
+        tel2:headers.indexOf('청구전화번호'),
+        mobile:headers.indexOf('휴대폰'),
+        cStatus:headers.indexOf('계약상태(대)'),
+        cStatusM:headers.indexOf('계약상태(중)'),
+        sStatus:headers.indexOf('서비스상태(대)'),
+        sStatusM:headers.indexOf('서비스상태(중)'),
+        stopDate:headers.indexOf('정지시작일자'),
+        stopEnd:headers.indexOf('정지희망종료일'),
+        termDate:headers.indexOf('해지일자'),
+        mgr:headers.indexOf('담당자'),
+        mgrBranch:headers.indexOf('구역담당지점'),
+        mgrStaff:headers.indexOf('구역담당영업사원'),
+        salesName:headers.indexOf('영업자명'),
+        salesTel:headers.indexOf('영업자연락처'),
+        addr:headers.indexOf('설치주소'),
+        fee:headers.indexOf('견적월정료'),
+        kttFee:headers.indexOf('KTT월정료'),
+      };
+
+      // 4가지 인덱스 빌드
+      const bySvc={}, byCno={}, byCust={}, byName={};
+
+      for(let i=1;i<lines.length;i++){
+        const row=parseCsv(lines[i]);
+        if(!row.length) continue;
+        const rec=buildFacRec(row,fi);
+
+        // 서비스번호 (숫자 정규화)
+        const svc=normNum(row[fi.svc]||'');
+        if(svc && !bySvc[svc]) bySvc[svc]=rec;
+
+        // 계약번호
+        const cno=normNum(row[fi.cno]||'');
+        if(cno && !byCno[cno]) byCno[cno]=rec;
+
+        // 고객번호
+        const cust=normNum(row[fi.cust]||'');
+        if(cust){
+          if(!byCust[cust]) byCust[cust]=[];
+          byCust[cust].push(rec);
+        }
+
+        // 상호명 (정규화)
+        const name=normName(row[fi.name]||'');
+        if(name && !byName[name]) byName[name]=rec;
+      }
+
+      FAC={bySvc,byCno,byCust,byName};
+      facLoaded=true;
+      e.target.value='';
+
+      // 4단계 자동 매칭 수행
+      let cnt={svc:0,cno:0,cust:0,name:0,none:0};
+      ALL=ALL.map(r=>{
+        const vSvc=normNum(r['서비스번호']||'');
+        const vCno=normNum(r['계약번호']||'');
+        const vCust=normNum(r['고객번호']||'');
+        const vName=normName(r['상호']||r['고객명']||'');
+        let rec=null, mtype='';
+
+        // 1순위: 서비스번호 정확 매칭
+        if(vSvc && bySvc[vSvc]){rec=bySvc[vSvc];mtype='svc';cnt.svc++;}
+        // 2순위: 계약번호 매칭
+        else if(vCno && byCno[vCno]){rec=byCno[vCno];mtype='cno';cnt.cno++;}
+        // 3순위: 고객번호 매칭 (서비스번호 가장 가까운 것 선택)
+        else if(vCust && byCust[vCust]){
+          const candidates=byCust[vCust];
+          rec=candidates[0]; // 첫 번째
+          mtype='cust';cnt.cust++;
+        }
+        // 4순위: 상호명 정규화 매칭
+        else if(vName && byName[vName]){rec=byName[vName];mtype='name';cnt.name++;}
+        else cnt.none++;
+
+        if(rec) return {...r,_matchType:mtype,_bizZone:rec.bizZone||'',_techZone:rec.techZone||'',_tel:rec.mobile||rec.tel1||rec.tel2||'',_cStatus:rec.cStatus||'',_cStatusM:rec.cStatusM||'',_sStatusM:rec.sStatusM||'',_stopDate:rec.stopDate||'',_stopEnd:rec.stopEnd||'',_termDate:rec.termDate||'',_mgr:rec.mgr||'',_mgrBranch:rec.mgrBranch||'',_mgrStaff:rec.mgrStaff||'',_salesName:rec.salesName||'',_salesTel:rec.salesTel||'',_facAddr:rec.addr||'',_fee:rec.fee||''};
+        return {...r,_matchType:''};
+      });
+
+      const total=cnt.svc+cnt.cno+cnt.cust+cnt.name;
+      document.getElementById('facPill').textContent=`✅ 매칭 ${total}건 (서비스${cnt.svc}/계약${cnt.cno}/고객${cnt.cust}/상호${cnt.name})`;
+      document.getElementById('facPill').className='fac-pill ok';
+      document.getElementById('matchLbl').textContent=`총 ${total}건 매칭 / 미매칭 ${cnt.none}건`;
+      applyFilter(); renderDash();
+    }catch(err){alert('시설파일 오류: '+err.message);console.error(err);}
+  };
+  rd.readAsText(file,'cp949');
+}
+
+function buildFacRec(row,fi){
+  const g=(idx)=>idx>=0?(row[idx]||'').trim().replace(/^nan$/i,''):'';
+  return {bizZone:g(fi.bizZone),techZone:g(fi.techZone),tel1:g(fi.tel1),tel2:g(fi.tel2),mobile:g(fi.mobile),cStatus:g(fi.cStatus),cStatusM:g(fi.cStatusM),sStatus:g(fi.sStatus),sStatusM:g(fi.sStatusM),stopDate:g(fi.stopDate),stopEnd:g(fi.stopEnd),termDate:g(fi.termDate),mgr:g(fi.mgr),mgrBranch:g(fi.mgrBranch),mgrStaff:g(fi.mgrStaff),salesName:g(fi.salesName),salesTel:g(fi.salesTel),addr:g(fi.addr),fee:g(fi.fee)};
+}
+
+function normNum(s){ try{return String(parseInt(parseFloat(String(s).trim())));} catch{return String(s).trim();} }
+function normName(s){ return s.replace(/[\(\)\[\]\s\-_\.]/g,'').replace(/GiGAeyes.*|OCT.*|ktt.*|\(.*\)/g,'').toLowerCase().trim(); }
+
+function parseCsv(line){
+  const r=[]; let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){r.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  r.push(cur.trim());
+  return r;
+}
+
+// ═══ MATCH FILTER BUTTONS ═══
+let currentMatchFilter='all';
+function setMatchFilter(type,btn){
+  currentMatchFilter=type;
+  document.querySelectorAll('.match-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  pg=1; applyFilter();
+}
+
+// ═══ FILTER ═══
+const gv=id=>document.getElementById(id).value;
+
+function applyFilter(){
+  const st=gv('f_st'),dt=gv('f_dt'),vt=gv('f_vt'),br=gv('f_br'),png=gv('f_png'),cs=gv('f_cs'),zone=gv('f_zone').toUpperCase(),kw=gv('f_kw').trim().toLowerCase();
+  filtered=ALL.filter(r=>{
+    // 매칭 버튼 필터
+    if(currentMatchFilter==='matched' && !r._matchType) return false;
+    if(currentMatchFilter==='unmatched' && r._matchType) return false;
+    if(currentMatchFilter==='svc' && r._matchType!=='svc') return false;
+    if(currentMatchFilter==='cno' && r._matchType!=='cno') return false;
+    if(currentMatchFilter==='cust' && r._matchType!=='cust') return false;
+    if(currentMatchFilter==='name' && r._matchType!=='name') return false;
+    if(currentMatchFilter==='stop' && r._cStatusM!=='일시정지') return false;
+    if(currentMatchFilter==='term' && !['일반해지','명변해지','전출해지'].includes(r._cStatusM)) return false;
+    // 일반 필터
+    if(st && r['상태']!==st) return false;
+    if(dt && r['담당유형']!==dt) return false;
+    if(vt && r['VOC유형대']!==vt) return false;
+    if(br && r['관리지사']!==br) return false;
+    if(png && (r['P/N/G']||'').trim()!==png) return false;
+    if(cs && r._cStatusM!==cs) return false;
+    if(zone && !(r._bizZone.includes(zone)||r._techZone.includes(zone))) return false;
+    if(kw){
+      const h=[r['서비스번호'],r['상호'],r['고객명'],r['고객번호'],r['계약번호'],r['등록내용'],r['접수번호'],r._tel,r._mgr,r._bizZone].join(' ').toLowerCase();
+      if(!h.includes(kw)) return false;
+    }
+    return true;
+  });
+  sortData(); pg=1;
+  renderKPI(); renderTable(); renderTags(st,dt,vt,br,png,cs,zone,kw);
+  renderCharts();
+}
+
+function resetFilter(){
+  ['f_st','f_dt','f_vt','f_br','f_png','f_cs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f_zone').value='';
+  document.getElementById('f_kw').value='';
+  applyFilter();
+}
+
+function renderTags(st,dt,vt,br,png,cs,zone,kw){
+  const lbl={st:'상태',dt:'담당유형',vt:'VOC유형대',br:'관리지사',png:'P/N/G',cs:'계약상태',zone:'영업구역',kw:'키워드'};
+  const vals={st,dt,vt,br,png,cs,zone,kw};
+  document.getElementById('tagWrap').innerHTML=Object.entries(vals).filter(([,v])=>v).map(([k,v])=>`<span class="atag" onclick="clearTag('${k}')"><span>✕</span>${lbl[k]}: ${v}</span>`).join('');
+}
+function clearTag(k){const m={st:'f_st',dt:'f_dt',vt:'f_vt',br:'f_br',png:'f_png',cs:'f_cs',zone:'f_zone',kw:'f_kw'};document.getElementById(m[k]).value='';applyFilter();}
+
+// ═══ SORT ═══
+function srt(key){
+  if(sortKey===key)sortDir*=-1;else{sortKey=key;sortDir=1;}
+  document.querySelectorAll('thead th').forEach(th=>{th.classList.remove('asc','desc');if(th.getAttribute('onclick')===`srt('${key}')`)th.classList.add(sortDir>0?'asc':'desc');});
+  sortData(); renderTable();
+}
+function sortData(){
+  filtered.sort((a,b)=>{
+    const av=a[sortKey]||'',bv=b[sortKey]||'';
+    const an=parseFloat(String(av).replace(/,/g,'')),bn=parseFloat(String(bv).replace(/,/g,''));
+    if(!isNaN(an)&&!isNaN(bn))return(an-bn)*sortDir;
+    return String(av).localeCompare(String(bv),'ko')*sortDir;
+  });
+}
+
+// ═══ KPI ═══
+function renderKPI(){
+  const d=filtered,t=d.length;
+  const matched=d.filter(r=>r._matchType).length;
+  const unrecv=d.filter(r=>r['상태']==='미접수').length;
+  const stop=d.filter(r=>r._cStatusM==='일시정지').length;
+  const term=d.filter(r=>['일반해지','명변해지','전출해지'].includes(r._cStatusM)).length;
+  const billing=d.filter(r=>r['VOC유형대']==='청구 미/수납').length;
+  const churn=d.filter(r=>r['VOC유형대']==='해지').length;
+  const urgent=d.filter(r=>/강성|불만|빠른연락|해지/.test(r['등록내용'])).length;
+  document.getElementById('kpiBar').innerHTML=`
+    <div class="kpi" onclick=""><div class="kpi-label">전체 VOC</div><div class="kpi-val">${t}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b8"><div class="kpi-label">시설매칭</div><div class="kpi-val" style="color:var(--teal)">${matched}</div><div class="kpi-sub">총 ${t?Math.round(matched/t*100):0}%</div></div>
+    <div class="kpi b2"><div class="kpi-label">미접수</div><div class="kpi-val" style="color:var(--org)">${unrecv}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b4"><div class="kpi-label">정지 시설</div><div class="kpi-val" style="color:var(--org)">${stop}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b4"><div class="kpi-label">해지 시설</div><div class="kpi-val" style="color:var(--red)">${term}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b5"><div class="kpi-label">청구·수납</div><div class="kpi-val" style="color:var(--pur)">${billing}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b2"><div class="kpi-label">해지 VOC</div><div class="kpi-val" style="color:var(--org)">${churn}</div><div class="kpi-sub">건</div></div>
+    <div class="kpi b4"><div class="kpi-label">강성·긴급</div><div class="kpi-val" style="color:var(--red)">${urgent}</div><div class="kpi-sub">건</div></div>
+  `;
+  document.getElementById('fCnt').textContent=t;
+  document.getElementById('tCnt').textContent=ALL.length;
+}
+
+// ═══ DASHBOARD ═══
+function renderDash(){
+  renderKPI();
+  // AI insight
+  const ai=[];
+  const d=ALL;
+  const urgent=d.filter(r=>/강성|불만|빠른연락/.test(r['등록내용'])).length;
+  const stop=d.filter(r=>r._cStatusM==='일시정지').length;
+  const term=d.filter(r=>['일반해지','명변해지','전출해지'].includes(r._cStatusM)).length;
+  const unrecv=d.filter(r=>r['상태']==='미접수').length;
+  const matched=d.filter(r=>r._matchType).length;
+  if(urgent>0) ai.push(`⚡ 강성·긴급 VOC <b>${urgent}건</b> — 즉시 1:1 연락 조치 필요`);
+  if(stop>0) ai.push(`⏸ 시설 일시정지 상태 <b>${stop}건</b> — 정지 만료일 확인 및 재개 안내 권고`);
+  if(term>0) ai.push(`🔴 해지 시설 VOC <b>${term}건</b> — 철거·정산 처리 완료 여부 확인`);
+  if(unrecv>0) ai.push(`📋 미접수 VOC <b>${unrecv}건</b> — 담당자 배정 및 처리 시작 필요`);
+  if(facLoaded) ai.push(`🔗 시설파일 매칭 <b>${matched}/${d.length}건</b> — 4단계(서비스번호→계약번호→고객번호→상호명) 자동 매칭 완료`);
+  const ab=document.getElementById('aiBox');
+  if(ai.length){ab.style.display='';document.getElementById('aiList').innerHTML=ai.map(a=>`<li>${a}</li>`).join('');}
+  renderCharts();
+}
+
+// ═══ CHARTS ═══
+function renderCharts(){
+  const d=filtered;
+  const byType={};
+  d.forEach(r=>{const v=r['VOC유형대']||'미상';byType[v]=(byType[v]||0)+1;});
+  const tL=Object.keys(byType),tD=Object.values(byType);
+  if(charts.type)charts.type.destroy();
+  charts.type=new Chart(document.getElementById('cType'),{type:'doughnut',data:{labels:tL,datasets:[{data:tD,backgroundColor:CLR,borderWidth:1,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false}}}});
+  document.getElementById('typeLeg').innerHTML=tL.map((l,i)=>`<span style="display:flex;align-items:center;gap:3px;cursor:pointer" onclick="setVT('${l}')"><span style="width:8px;height:8px;border-radius:2px;background:${CLR[i]||'#ccc'}"></span><span style="color:var(--t2)">${l} ${tD[i]}</span></span>`).join('');
+
+  const branches=['강북지사','서대문지사','고양지사','의정부지사','남양주지사','중앙지사','강릉지사','원주지사'];
+  if(charts.branch)charts.branch.destroy();
+  charts.branch=new Chart(document.getElementById('cBranch'),{type:'bar',data:{labels:branches.map(b=>b.replace('지사','')),datasets:[{data:branches.map(b=>d.filter(r=>r['관리지사']===b).length),backgroundColor:'#3b82f6',borderRadius:3,barThickness:13}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1,color:'#9ca3af'},grid:{color:'#f1f5f9'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{display:false}}}}});
+
+  const stateMap={};
+  d.filter(r=>r._matchType).forEach(r=>{const s=r._cStatusM||'미상';stateMap[s]=(stateMap[s]||0)+1;});
+  const sL=Object.keys(stateMap),sD=Object.values(stateMap);
+  const sCLR={유지:'#22c55e',명변유지:'#0891b2',일시정지:'#f97316',청구설변:'#fbbf24',일반해지:'#ef4444',명변해지:'#dc2626',전출해지:'#b91c1c'};
+  if(charts.state)charts.state.destroy();
+  charts.state=new Chart(document.getElementById('cState'),{type:'bar',data:{labels:sL,datasets:[{data:sD,backgroundColor:sL.map(l=>sCLR[l]||'#94a3b8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,color:'#9ca3af'},grid:{color:'#f1f5f9'}},x:{ticks:{color:'#6b7280',font:{size:10}},grid:{display:false}}}}});
+}
+function setVT(v){showPage('list',document.querySelectorAll('.tn')[1]);document.getElementById('f_vt').value=v;applyFilter();}
+
+// ═══ TABLE ═══
+const MATCH_LABEL={svc:'🔑서비스',cno:'📄계약',cust:'👤고객',name:'🏪상호'};
+const MATCH_CLS={svc:'match-svc',cno:'match-cno',cust:'match-cust',name:'match-name'};
+
+function renderTable(){
+  const kw=gv('f_kw').trim();
+  const start=(pg-1)*pgSz, pD=filtered.slice(start,start+pgSz);
+  const tbody=document.getElementById('vocBody');
+  if(!pD.length){tbody.innerHTML=`<tr><td colspan="17" class="no-data">결과 없음</td></tr>`;renderPg();return;}
+  tbody.innerHTML=pD.map((r,i)=>{
+    const m=r._matchType;
+    const isStop=r._cStatusM==='일시정지';
+    const isTerm=['일반해지','명변해지','전출해지'].includes(r._cStatusM);
+    const tel=(r._tel||'').replace(/(\d{3})(\d{3,4})(\d{4})/,'$1-$2-$3');
+    return `<tr onclick="openDetail(${start+i})">
+      <td style="color:var(--t3);font-size:10px;text-align:center">${r._idx}</td>
+      <td><span class="bdg ${ST_CLS[r['상태']]||'b-gr'}">${r['상태']}</span></td>
+      <td><span class="bdg ${DT_CLS[r['담당유형']]||'b-gr'}">${r['담당유형']}</span></td>
+      <td class="sn">${hl(r['서비스번호'],kw)}</td>
+      <td style="font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${hl(r['상호']||r['고객명'],kw)}</td>
+      <td style="font-size:11px;color:var(--t2)">${r['관리지사']||'—'}</td>
+      <td><span class="bdg ${VC_CLS[r['VOC유형대']]||'b-gr'}" style="font-size:10px">${r['VOC유형대']||'—'}</span></td>
+      <td style="font-size:11px;color:var(--t2);max-width:125px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${hl(r['VOC유형'],kw)}</td>
+      <td><div class="cc">${hl((r['등록내용']||'').slice(0,170),kw)}</div></td>
+      <td style="white-space:nowrap;font-size:11px;color:var(--t2)">${r['접수일시']||'—'}</td>
+      <td>${m?`<span class="zt">${hl(r._bizZone,kw)}</span>`:facLoaded?'<span class="no-match-dim">미매칭</span>':'<span class="no-match-dim">—</span>'}</td>
+      <td style="font-size:11px;color:${m?'var(--text)':'var(--t3)'}">${m?hl(tel||r._tel,kw):'—'}</td>
+      <td>${m?`<span class="bdg ${CS_CLS[r._cStatusM]||'b-gr'}" style="font-size:10px">${r._cStatusM}</span>`:'<span class="no-match-dim">—</span>'}</td>
+      <td style="font-size:11px;${isStop?'color:var(--org);font-weight:700':''}">${m&&r._stopDate?r._stopDate:'—'}</td>
+      <td style="font-size:11px;${isTerm?'color:var(--red);font-weight:700':''}">${m&&r._termDate?r._termDate:'—'}</td>
+      <td style="font-size:11px;color:var(--t2)">${m?(r._mgr||r._mgrStaff||'—'):'—'}</td>
+      <td>${m?`<span class="bdg ${MATCH_CLS[m]||'b-gr'}" style="font-size:10px">${MATCH_LABEL[m]}</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+  renderPg();
+}
+
+function hl(text,kw){
+  if(!kw||!text)return text||'';
+  return String(text).replace(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<span class="hl">${m}</span>`);
+}
+
+function renderPg(){
+  const total=Math.ceil(filtered.length/pgSz);
+  if(total<=1){document.getElementById('pgBar').innerHTML='';return;}
+  const s=Math.max(1,pg-2),e=Math.min(total,pg+2);
+  let h=`<button class="pg-b" onclick="goPg(${pg-1})" ${pg<=1?'disabled':''}>‹</button>`;
+  if(s>1)h+=`<button class="pg-b" onclick="goPg(1)">1</button>${s>2?'<span style="padding:0 4px;color:var(--t3)">…</span>':''}`;
+  for(let i=s;i<=e;i++)h+=`<button class="pg-b${i===pg?' cur':''}" onclick="goPg(${i})">${i}</button>`;
+  if(e<total)h+=`${e<total-1?'<span style="padding:0 4px;color:var(--t3)">…</span>':''}<button class="pg-b" onclick="goPg(${total})">${total}</button>`;
+  h+=`<button class="pg-b" onclick="goPg(${pg+1})" ${pg>=total?'disabled':''}>›</button>`;
+  document.getElementById('pgBar').innerHTML=h;
+}
+function goPg(p){const t=Math.ceil(filtered.length/pgSz);if(p<1||p>t)return;pg=p;renderTable();document.querySelector('.tbl-card').scrollIntoView({behavior:'smooth',block:'start'});}
+
+// ═══ PAGE NAV ═══
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(id==='dash')renderDash();
+  if(id==='analysis'){renderTech();applyFilter();}
+}
+
+// ═══ MODAL ═══
+function openDetail(idx){
+  const r=filtered[idx]; if(!r) return;
+  document.getElementById('ov').classList.add('open');
+  document.getElementById('mTitle').textContent=r['상호']||r['고객명']||'—';
+  document.getElementById('mSub').textContent=`접수번호: ${r['접수번호']||'—'} · ${r['접수일시']||'—'}`;
+  renderTabV(r); renderTabF(r); renderTabC(r);
+  showTab('v',document.querySelector('.tb'));
+}
+function closeM(){document.getElementById('ov').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
+function showTab(id,btn){
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+function renderTabV(r){
+  const risk=calcRisk(r),rC=risk>=20?'var(--red)':risk>=10?'var(--org)':'var(--green)';
+  document.getElementById('tab-v').innerHTML=`
+  <div class="ds"><h4>📌 기본정보</h4><div class="dg dg3">
+    <div class="di"><label>고객번호</label><div class="v">${r['고객번호']||'—'}</div></div>
+    <div class="di"><label>계약번호</label><div class="v">${r['계약번호']||'—'}</div></div>
+    <div class="di"><label>서비스번호</label><div class="v">${r['서비스번호']||'—'}</div></div>
+    <div class="di"><label>고객명</label><div class="v">${r['고객명']||'—'}</div></div>
+    <div class="di"><label>상호</label><div class="v">${r['상호']||'—'}</div></div>
+    <div class="di"><label>관리지사</label><div class="v">${r['관리지사']||'—'}</div></div>
+  </div></div>
+  <div class="ds"><h4>🎯 VOC정보</h4><div class="dg">
+    <div class="di"><label>상태</label><div class="v"><span class="bdg ${ST_CLS[r['상태']]||'b-gr'}">${r['상태']||'—'}</span></div></div>
+    <div class="di"><label>담당유형·상세</label><div class="v">${r['담당유형']||'—'} · ${r['담당상세']||'—'}</div></div>
+    <div class="di"><label>VOC유형</label><div class="v">${r['VOC유형대']||'—'} > ${r['VOC유형중']||''} > ${r['VOC유형소']||''}</div></div>
+    <div class="di"><label>세부유형</label><div class="v">${r['VOC유형']||'—'}</div></div>
+    <div class="di"><label>등록경로</label><div class="v">${r['등록경로']||'—'}</div></div>
+    <div class="di"><label>처리자·처리유형</label><div class="v">${r['처리자']||'—'} · ${r['처리유형']||'—'}</div></div>
+  </div></div>
+  <div class="ds"><h4>📝 등록내용</h4><div class="cbox">${r['등록내용']||'—'}</div></div>
+  ${r['처리내용']?`<div class="ds"><h4>✅ 처리내용</h4><div class="pbox">${r['처리내용']}</div></div>`:''}
+  <div class="ds"><h4>📊 리스크 스코어</h4>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1"><div class="rb"><div class="rf" style="width:${Math.min(risk/30*100,100)}%;background:${rC}"></div></div></div>
+      <span style="font-size:13px;font-weight:700;color:${rC}">${risk>=20?'🔥고위험':risk>=10?'⚠️주의':'✅양호'} ${risk}점</span>
+    </div>
+  </div>`;
+}
+
+function renderTabF(r){
+  const p=document.getElementById('tab-f');
+  if(!r._matchType){
+    p.innerHTML=`<div class="nm-box">⚠️ 서비스번호 <b>${r['서비스번호']||'없음'}</b> / 계약번호 <b>${r['계약번호']||'없음'}</b> / 고객번호 <b>${r['고객번호']||'없음'}</b><br><br>
+    위 키값으로 시설파일에서 매칭 데이터를 찾지 못했습니다.<br>
+    <b>🏢 시설CSV</b> 버튼으로 CSV 파일 업로드 시 4단계 자동매칭이 실행됩니다.<br>
+    (서비스번호 → 계약번호 → 고객번호 → 상호명 순서)</div>`;
+    return;
+  }
+  const mLbl={svc:'🔑 서비스번호 정확매칭',cno:'📄 계약번호 매칭',cust:'👤 고객번호 매칭',name:'🏪 상호명 매칭'};
+  const isStop=r._cStatusM==='일시정지', isTerm=['일반해지','명변해지','전출해지'].includes(r._cStatusM);
+  p.innerHTML=`
+  <div class="ms">
+    <h4>🏢 시설파일 매칭정보 <span class="match-badge ${MATCH_CLS[r._matchType]||''}">${mLbl[r._matchType]||''}</span></h4>
+    <div class="mdg">
+      <div class="mi"><label>영업구역번호</label><div class="v">${r._bizZone||'—'}</div></div>
+      <div class="mi"><label>기술구역번호</label><div class="v">${r._techZone||'—'}</div></div>
+      <div class="mi"><label>계약상태(중)</label><div class="v"><span class="bdg ${CS_CLS[r._cStatusM]||'b-gr'}">${r._cStatusM||'—'}</span></div></div>
+      <div class="mi"><label>연락처(휴대폰)</label><div class="v">${r._tel||'—'}</div></div>
+      <div class="mi"><label>서비스상태(중)</label><div class="v">${r._sStatusM||'—'}</div></div>
+      <div class="mi"><label>계약상태(대)</label><div class="v">${r._cStatus||'—'}</div></div>
+      ${r._stopDate?`<div class="mi" style="border:1px solid #fcd34d"><label>정지시작일자</label><div class="v" style="color:var(--org);font-weight:700">${r._stopDate}</div></div>`:''}
+      ${r._stopEnd?`<div class="mi" style="border:1px solid #fcd34d"><label>정지희망종료일</label><div class="v" style="color:var(--org)">${r._stopEnd}</div></div>`:''}
+      ${r._termDate?`<div class="mi" style="border:1px solid #fca5a5"><label>해지일자</label><div class="v" style="color:var(--red);font-weight:700">${r._termDate}</div></div>`:''}
+      <div class="mi"><label>담당자</label><div class="v">${r._mgr||'—'}</div></div>
+      <div class="mi"><label>구역담당지점</label><div class="v">${r._mgrBranch||'—'}</div></div>
+      <div class="mi"><label>구역담당영업사원</label><div class="v">${r._mgrStaff||'—'}</div></div>
+      <div class="mi"><label>영업자명</label><div class="v">${r._salesName||'—'}</div></div>
+      <div class="mi"><label>영업자연락처</label><div class="v">${r._salesTel||'—'}</div></div>
+      ${r._fee?`<div class="mi"><label>견적월정료</label><div class="v">${parseInt(r._fee).toLocaleString()}원</div></div>`:''}
+    </div>
+    ${r._facAddr?`<div style="margin-top:10px;background:rgba(255,255,255,.7);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--t2)">📍 설치주소: ${r._facAddr}</div>`:''}
+  </div>`;
+}
+
+function renderTabC(r){
+  document.getElementById('tab-c').innerHTML=`
+  <div class="ds"><h4>📄 서비스·계약정보</h4><div class="dg dg3">
+    <div class="di"><label>서비스대/중</label><div class="v">${r['서비스대']||'—'} / ${r['서비스중']||'—'}</div></div>
+    <div class="di"><label>서비스소</label><div class="v">${r['서비스소']||'—'}</div></div>
+    <div class="di"><label>회선방식</label><div class="v">${r['회선방식대']||'—'} / ${r['회선방식중']||'—'}</div></div>
+    <div class="di"><label>서비스개시일</label><div class="v">${r['서비스개시일']||'—'}</div></div>
+    <div class="di"><label>계약종료일</label><div class="v" style="${r['계약종료일']&&r['계약종료일'].replace(/\./g,'-')<='2026-09-30'?'color:var(--red);font-weight:700':''}">${r['계약종료일']||'—'}</div></div>
+    <div class="di"><label>월정료</label><div class="v">${r['월정료(VAT미포함)']||'—'}</div></div>
+    <div class="di"><label>P/N/G</label><div class="v">${(r['P/N/G']||'').trim()||'—'}</div></div>
+    <div class="di"><label>본사/팀</label><div class="v">${r['본사']||'—'} / ${r['팀']||'—'}</div></div>
+    <div class="di"><label>접수횟수</label><div class="v">${r['접수횟수']||'0'}회</div></div>
+    <div class="di"><label>접수번호</label><div class="v" style="font-size:11px;font-family:monospace">${r['접수번호']||'—'}</div></div>
+    <div class="di"><label>관련AS</label><div class="v" style="font-size:11px;font-family:monospace;color:var(--teal)">${r['관련AS']||'—'}</div></div>
+    <div class="di"><label>처리완료일시</label><div class="v">${r['처리완료일시']||'미완료'}</div></div>
+  </div></div>`;
+}
+
+function calcRisk(r){
+  let s=0;
+  if(/강성|불만|해지/.test(r['등록내용']))s+=6;
+  if(/빠른연락|빠른/.test(r['등록내용']))s+=3;
+  if(r['상태']==='미접수')s+=4;
+  if(r['VOC유형대']==='청구 미/수납')s+=5;
+  if(r['VOC유형대']==='해지')s+=4;
+  if(r['접수횟수']==='1')s+=4;
+  if(r._cStatusM==='일시정지')s+=2;
+  if(['일반해지','명변해지'].includes(r._cStatusM))s+=6;
+  return Math.min(s,30);
+}
+
+// ═══ TOP10 TECH ═══
+const TECHS=[
+  {n:'T1',icon:'⚡',name:'긴급도×영향도 매트릭스',desc:'4분면 자동 분류 — 즉시/계획/위임/보류'},
+  {n:'T2',icon:'🔍',name:'5Why 근본원인 분석',desc:'등록내용 기반 패턴별 근본원인 도출'},
+  {n:'T3',icon:'📊',name:'키워드 빈도 분석',desc:'고빈도 키워드 추출·시각화'},
+  {n:'T4',icon:'😤',name:'고객 감정 분류',desc:'강성·주의·일반 3단계 자동 감지'},
+  {n:'T5',icon:'📈',name:'파레토 80/20 분석',desc:'핵심 20% 원인 식별'},
+  {n:'T6',icon:'🧩',name:'VOC 유형 클러스터링',desc:'패턴 기반 자동 그룹핑'},
+  {n:'T7',icon:'📅',name:'시계열 이상감지',desc:'접수 급증 구간 자동 경보'},
+  {n:'T8',icon:'👥',name:'담당자 편중 분석',desc:'담당코드 업무 과부하 식별'},
+  {n:'T9',icon:'🔄',name:'반복고객 추적',desc:'동일 서비스번호 재접수 식별'},
+  {n:'T10',icon:'🎯',name:'리스크 스코어링',desc:'복합 가중치 위험 점수 산출 TOP10'},
+];
+
+function renderTech(){
+  document.getElementById('techGrid').innerHTML=TECHS.map(t=>`
+    <div class="tech-card" onclick="applyTech('${t.n}',this)">
+      <div class="tn-num">${t.icon}</div>
+      <div class="tn-name">${t.n}. ${t.name}</div>
+      <div class="tn-desc">${t.desc}</div>
+    </div>`).join('');
+}
+
+function applyTech(n,el){
+  document.querySelectorAll('.tech-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const res=document.getElementById('techResult');
+  const body=document.getElementById('techResultBody');
+  res.style.display='block';
+  const t=TECHS.find(x=>x.n===n);
+  const d=filtered.length?filtered:ALL;
+  body.innerHTML=`<h3>${t.icon} ${t.n}. ${t.name}</h3>`+getTechResult(n,d);
+  res.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function getTechResult(n,d){
+  if(n==='T1'){
+    const q1=[],q2=[],q3=[],q4=[];
+    d.forEach(r=>{const em=emScore(r),days=daysDiff(r['접수일시']);const urg=em>=5,high=em>=2||days>3;if(urg&&high)q1.push(r);else if(urg)q2.push(r);else if(high)q3.push(r);else q4.push(r);});
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${[{l:'🔴 즉시처리',a:q1,c:'var(--red)',bg:'var(--red2)'},{l:'🟠 계획처리',a:q2,c:'var(--org)',bg:'var(--org2)'},{l:'🔵 위임처리',a:q3,c:'var(--blue)',bg:'var(--blue2)'},{l:'⚪ 보류',a:q4,c:'var(--t2)',bg:'var(--g2)'}].map(({l,a,c,bg})=>`
+        <div style="background:${bg};border-radius:var(--rs);padding:12px">
+          <div style="font-weight:700;color:${c};margin-bottom:6px">${l} (${a.length}건)</div>
+          ${a.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--t2);margin-bottom:3px">• ${r['상호']||r['고객명']||'미상'} — ${r['VOC유형']||r['VOC유형대']}</div>`).join('')}
+          ${a.length>3?`<div style="font-size:11px;color:var(--t3)">외 ${a.length-3}건...</div>`:''}
+        </div>`).join('')}
+    </div>`;
+  }
+  if(n==='T2'){
+    const examples=[
+      {issue:'미연락/빠른연락요청',w1:'담당자 응답 지연',w2:'업무 과부하',w3:'배정 시스템 미흡',root:'자동 배정·알림 시스템 부재'},
+      {issue:'이중납부/환급요청',w1:'자동이체+수동납부 중복',w2:'납부상태 확인 미흡',w3:'실시간 연동 부재',root:'납부상태 실시간 알림 미연동'},
+    ];
+    return examples.map(e=>`
+      <div style="background:var(--g2);border-radius:var(--rs);padding:13px;margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:8px">🔍 ${e.issue}</div>
+        ${[e.w1,e.w2,e.w3].map((w,i)=>`<div style="margin-left:${i*14}px;padding:5px 9px;background:${i%2?'var(--blue2)':'#fff'};border-radius:4px;margin-bottom:4px;font-size:12px">Why ${i+1}: ${w}</div>`).join('')}
+        <div style="margin-left:42px;padding:7px 9px;background:var(--red2);border-radius:4px;font-size:12px;font-weight:700;color:var(--red)">근본원인: ${e.root}</div>
+      </div>`).join('');
+  }
+  if(n==='T3'){
+    const allText=d.map(r=>r['등록내용']).join(' ');
+    const kws=extractKW(allText).slice(0,12);
+    const max=kws[0]?kws[0][1]:1;
+    const bg=['#dbeafe','#ede9fe','#dcfce7','#fff3dc','#fee2e2','#cffafe'];
+    const tx=['#1d4ed8','#6d28d9','#15803d','#c06a17','#b91c1c','#0e7490'];
+    return `<div class="tag-cloud" style="margin-bottom:12px">${kws.map(([k,v],i)=>`<span class="tc" style="background:${bg[i%6]};color:${tx[i%6]};font-size:${11+Math.round(v/max*7)}px">${k} ${v}</span>`).join('')}</div>
+      ${kws.map(([k,v])=>`<div class="progress-row"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="font-weight:600">${k}</span><span style="color:var(--t3)">${v}회 (${Math.round(v/d.length*100)}%)</span></div><div class="pb"><div class="pf" style="width:${Math.round(v/max*100)}%;background:var(--blue)"></div></div></div>`).join('')}`;
+  }
+  if(n==='T4'){
+    const h=d.filter(r=>emScore(r)>=6),m=d.filter(r=>emScore(r)>=3&&emScore(r)<6),l=d.filter(r=>emScore(r)<3);
+    return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:13px">
+      <div style="background:var(--red2);border-radius:var(--rs);padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--red)">${h.length}</div><div style="font-size:11px;color:var(--t3)">😤 강성 (6+)</div></div>
+      <div style="background:var(--org2);border-radius:var(--rs);padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--org)">${m.length}</div><div style="font-size:11px;color:var(--t3)">⚠️ 주의 (3~5)</div></div>
+      <div style="background:var(--green2);border-radius:var(--rs);padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)">${l.length}</div><div style="font-size:11px;color:var(--t3)">😊 일반 (0~2)</div></div>
+    </div>
+    ${h.slice(0,4).map(r=>`<div style="background:var(--red2);border-left:3px solid var(--red);border-radius:0 var(--rs) var(--rs) 0;padding:8px 10px;margin-bottom:7px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:2px">😤 ${r['상호']||r['고객명']||'미상'} — 감정점수 ${emScore(r)}</div>
+      <div style="font-size:11px;color:var(--t2)">${(r['등록내용']||'').slice(0,120)}…</div>
+    </div>`).join('')}`;
+  }
+  if(n==='T5'){
+    const byType={};
+    d.forEach(r=>{const v=r['VOC유형대']||'미상';byType[v]=(byType[v]||0)+1;});
+    const sorted=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+    let cum=0;
+    return `<div style="font-size:12px;color:var(--t2);margin-bottom:9px">상위 유형이 전체의 80%를 차지하는 구간을 식별합니다.</div>
+      ${sorted.map(([label,cnt])=>{cum+=cnt;const pct=Math.round(cnt/d.length*100);const cumpct=Math.round(cum/d.length*100);const is80=cumpct<=80;
+        return `<div style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-bottom:1px solid var(--bd);${is80?'background:var(--blue2);margin:0 -8px;padding:6px 16px;border-radius:4px;':''};margin-bottom:3px">
+          <span style="min-width:110px;font-size:12px;font-weight:${is80?'700':'400'};color:${is80?'var(--blue)':'var(--t2)'}">${label}</span>
+          <div class="pb" style="flex:1"><div class="pf" style="width:${pct*3}px;max-width:100%;background:${is80?'var(--blue)':'var(--bd2)'}"></div></div>
+          <span style="font-size:11px;color:var(--t3);min-width:55px;text-align:right">${cnt}건 (${pct}%)</span>
+          <span style="font-size:10px;color:${cumpct<=80?'var(--blue)':'var(--t3)'};min-width:44px">누적 ${cumpct}%</span>
+        </div>`;
+      }).join('')}`;
+  }
+  if(n==='T6'){
+    const clusters={};
+    d.forEach(r=>{const wf=classifyWF(r['등록내용']);if(!clusters[wf.label])clusters[wf.label]=[];clusters[wf.label].push(r);});
+    return Object.entries(clusters).sort((a,b)=>b[1].length-a[1].length).map(([label,items])=>{
+      const wf=classifyWF(items[0]['등록내용']);
+      return `<div style="margin-bottom:10px;border:1px solid var(--bd);border-radius:var(--rs);overflow:hidden">
+        <div style="background:var(--g2);padding:7px 11px;display:flex;align-items:center;gap:7px">
+          <span style="font-size:15px">${wf.icon}</span><span style="font-weight:700;font-size:13px">${label}</span>
+          <span class="bdg b-b" style="margin-left:auto">${items.length}건</span>
+        </div>
+        <div style="padding:7px 11px">
+          ${items.slice(0,3).map(r=>`<div style="font-size:11px;color:var(--t2);padding:3px 0;border-bottom:1px solid var(--g2)">${r['상호']||r['고객명']||'미상'} · ${r['접수일시']||'—'}</div>`).join('')}
+          ${items.length>3?`<div style="font-size:11px;color:var(--t3);padding:3px 0">외 ${items.length-3}건...</div>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  if(n==='T7'){
+    const byDate={};
+    d.forEach(r=>{const dt=(r['접수일시']||'미상').slice(0,10);byDate[dt]=(byDate[dt]||0)+1;});
+    const dates=Object.keys(byDate).sort(),vals=dates.map(dt=>byDate[dt]);
+    const avg=vals.reduce((a,b)=>a+b,0)/Math.max(vals.length,1);
+    const std=Math.sqrt(vals.reduce((a,b)=>a+(b-avg)**2,0)/Math.max(vals.length,1));
+    const thr=avg+std*1.5;
+    return `<div style="background:var(--g2);border-radius:var(--rs);padding:11px;margin-bottom:11px;font-size:12px;color:var(--t2);display:flex;gap:20px;flex-wrap:wrap">
+      <span>📊 일평균: <b>${avg.toFixed(1)}건</b></span>
+      <span>📈 임계값 (μ+1.5σ): <b>${thr.toFixed(1)}건</b></span>
+      <span>⚠️ 급증감지: <b style="color:var(--red)">${dates.filter((dt,i)=>vals[i]>thr).length}일</b></span>
+    </div>
+    ${dates.map((dt,i)=>{const an=vals[i]>thr;return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd)">
+      <span style="font-size:11px;min-width:80px;color:var(--t2)">${dt}</span>
+      <div class="pb" style="flex:1"><div class="pf" style="width:${Math.round(vals[i]/Math.max(...vals)*100)}%;background:${an?'var(--red)':'var(--blue)'}"></div></div>
+      <span style="font-size:12px;font-weight:${an?'700':'400'};color:${an?'var(--red)':'var(--t2)'}">${vals[i]}건${an?' ⚠️':''}</span>
+    </div>`;}).join('')}`;
+  }
+  if(n==='T8'){
+    const byCd={};
+    d.forEach(r=>{const k=r['담당상세']||'미상';if(!byCd[k])byCd[k]={count:0,types:{}};byCd[k].count++;const t=r['VOC유형대']||'미상';byCd[k].types[t]=(byCd[k].types[t]||0)+1;});
+    const sorted=Object.entries(byCd).sort((a,b)=>b[1].count-a[1].count);
+    const max=sorted[0]?sorted[0][1].count:1;
+    return sorted.map(([code,{count,types}])=>{const pct=Math.round(count/d.length*100);const heavy=pct>=20;return `<div style="margin-bottom:9px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:700;min-width:80px;color:${heavy?'var(--red)':'var(--text)'}">${code}</span>
+        <span class="bdg ${heavy?'b-r':'b-gr'}">${count}건 (${pct}%)</span>
+        ${heavy?'<span style="font-size:11px;color:var(--red)">⚠️ 과부하</span>':''}
+      </div>
+      <div class="pb"><div class="pf" style="width:${Math.round(count/max*100)}%;background:${heavy?'var(--red)':'var(--blue)'}"></div></div>
+      <div style="margin-top:2px;font-size:11px;color:var(--t3)">${Object.entries(types).map(([t,c])=>`${t}:${c}`).join(' · ')}</div>
+    </div>`}).join('');
+  }
+  if(n==='T9'){
+    const cnt={};
+    d.forEach(r=>{const k=r['서비스번호'];if(k){if(!cnt[k])cnt[k]=[];cnt[k].push(r);}});
+    const repeats=Object.entries(cnt).filter(([,v])=>v.length>1).sort((a,b)=>b[1].length-a[1].length);
+    return repeats.length?repeats.map(([svc,rows])=>`
+      <div style="background:var(--org2);border:1px solid var(--org);border-radius:var(--rs);padding:11px;margin-bottom:9px">
+        <div style="font-size:12px;font-weight:700;color:var(--org);margin-bottom:5px">🔄 서비스번호: ${svc} (${rows.length}회 반복)</div>
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">${rows[0]['상호']||rows[0]['고객명']}</div>
+        ${rows.map(r=>`<div style="font-size:11px;color:var(--t2);padding:2px 0;border-bottom:1px solid rgba(0,0,0,.05)">${r['접수일시']||'—'} — ${r['VOC유형대']} / ${r['VOC유형']}</div>`).join('')}
+      </div>`).join('')
+    :'<div style="text-align:center;padding:20px;color:var(--t3)">✅ 반복 접수 고객 없음</div>';
+  }
+  if(n==='T10'){
+    const scored=d.map(r=>({...r,_risk:calcRisk(r)})).sort((a,b)=>b._risk-a._risk);
+    return `<div style="font-size:12px;color:var(--t2);margin-bottom:10px">접수일 경과·감정강도·계약상태·VOC유형 복합 가중치 기반 리스크 점수</div>
+    ${scored.slice(0,10).map((r,i)=>{const lv=r._risk>=20?{cls:'b-r',lbl:'🔥위험',bar:'var(--red)'}:r._risk>=12?{cls:'b-o',lbl:'⚠️주의',bar:'var(--org)'}:{cls:'b-gr',lbl:'일반',bar:'var(--blue)'};
+      return `<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--bd)">
+        <span style="font-size:13px;font-weight:700;min-width:20px;color:var(--t3)">${i+1}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r['상호']||r['고객명']||'미상'}</div>
+          <div style="font-size:10px;color:var(--t3)">${r['접수일시']||'—'} · ${r['VOC유형대']} · ${r._cStatusM?'계약:'+r._cStatusM:''}</div>
+        </div>
+        <div class="pb" style="width:80px"><div class="pf" style="width:${Math.min(r._risk/30*100,100)}%;background:${lv.bar}"></div></div>
+        <span class="bdg ${lv.cls}" style="white-space:nowrap">${lv.lbl} ${r._risk}점</span>
+      </div>`;
+    }).join('')}`;
+  }
+  return '<div style="color:var(--t3);text-align:center;padding:20px">분석 결과를 준비 중입니다.</div>';
+}
+
+// ═══ HELPERS ═══
+function emScore(r){
+  let s=0;
+  const t=r['등록내용']||'';
+  if(/강성불만|강성/.test(t))s+=4;
+  if(/불만/.test(t))s+=2;
+  if(/빠른연락/.test(t))s+=2;
+  if(/해지|미연락|미방문/.test(t))s+=2;
+  if(/긴급|당일|즉시/.test(t))s+=1;
+  return Math.min(s,10);
+}
+function daysDiff(d){if(!d)return 0;return Math.floor((new Date()-new Date(d.slice(0,10)))/86400000);}
+function classifyWF(text){
+  if(/환급|이중납부|과오납|청구/.test(text))return{label:'청구·환급',icon:'💰'};
+  if(/해지|철거/.test(text))return{label:'해지·철거',icon:'🔴'};
+  if(/불만|강성|클레임/.test(text))return{label:'강성민원',icon:'😤'};
+  if(/정지/.test(text))return{label:'이용정지',icon:'⏸'};
+  if(/이전|설치|개통/.test(text))return{label:'설치·이전',icon:'🔧'};
+  if(/AS|각도|카메라|영상/.test(text))return{label:'AS·점검',icon:'🔩'};
+  if(/리텐션|만기/.test(text))return{label:'리텐션',icon:'🎯'};
+  if(/칭찬/.test(text))return{label:'칭찬',icon:'⭐'};
+  if(/가입|신규/.test(text))return{label:'신규가입',icon:'🆕'};
+  return{label:'일반',icon:'📋'};
+}
+function extractKW(text){
+  const tokens=text.replace(/[\/\(\)\[\]]/g,' ').split(/\s+/).filter(t=>t.length>=2&&!/^\d+$/.test(t));
+  const freq={};
+  tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,20);
+}
+
+// ═══ VOC FILE LOAD ═══
+function loadVOC(e){
+  const file=e.target.files[0];if(!file)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    const wb=XLSX.read(ev.target.result,{type:'binary'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1});
+    let hdr=-1;
+    for(let i=0;i<raw.length;i++){if(raw[i]&&(raw[i].includes('서비스번호')||raw[i].includes('접수번호'))){hdr=i;break;}}
+    if(hdr<0){alert('컬럼을 찾을 수 없습니다.');return;}
+    const headers=raw[hdr];
+    const data=raw.slice(hdr+1).filter(r=>r&&r.length>0).map(r=>{
+      const obj={};
+      headers.forEach((h,i)=>{let v=r[i]!==undefined?String(r[i]).trim():'';if(v.endsWith('.0')&&['고객번호','계약번호','서비스번호'].includes(h))v=v.slice(0,-2);if(['접수일시','처리완료일시'].includes(h)&&v.length>=10)v=v.slice(0,10);obj[h]=v;});
+      return obj;
+    });
+    e.target.value='';
+    setVOC(data);
+    if(facLoaded){FAC={};ALL.forEach(r=>{r._matchType='';});}
+    alert('✅ VOC '+data.length+'건 로드');
+  };
+  rd.readAsBinaryString(file);
+}
+
+// ═══ CSV EXPORT ═══
+function exportCSV(){
+  const cols=['상태','담당유형','서비스번호','상호','고객명','관리지사','VOC유형대','VOC유형','등록내용','처리내용','접수일시','처리완료일시','처리자','월정료(VAT미포함)','계약종료일','P/N/G','접수번호'];
+  const extra=['_matchType','_bizZone','_techZone','_tel','_cStatus','_cStatusM','_stopDate','_stopEnd','_termDate','_mgr','_mgrBranch','_salesName'];
+  const hdr=['상태','담당유형','서비스번호','상호','고객명','관리지사','VOC유형대','VOC유형','등록내용','처리내용','접수일시','처리완료일시','처리자','월정료','계약종료일','P/N/G','접수번호','매칭방식','영업구역번호','기술구역번호','연락처','계약상태대','계약상태중','정지시작일','정지종료일','해지일자','담당자','구역담당지점','영업자명'];
+  let csv='\uFEFF'+hdr.join(',')+'\n';
+  filtered.forEach(r=>{csv+=[...cols,...extra].map(c=>`"${(r[c]||'').replace(/"/g,'""').replace(/\n/g,' ')}"`).join(',')+'\n';});
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`VOC_시설매칭_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+</script>
+</body>
+</html>
