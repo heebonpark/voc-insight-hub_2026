@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from app.ui.components import load_css, render_metric
-from app.core.handlers import load_and_preprocess_data
+from app.core.handlers import load_and_preprocess_data, load_voc_only
 from app.core.ml_models import (
     extract_keywords, extract_topics_lda, cluster_vocs,
     detect_anomalies, analyze_sentiment_rule,
@@ -54,16 +54,24 @@ with st.sidebar:
     fac_file = st.file_uploader("2. 시설 정보 파일 (CSV / Excel)", type=['csv', 'xlsx', 'xls'])
 
     if st.button("🔍 데이터 분석 실행", use_container_width=True, type="primary"):
-        if voc_file and fac_file:
+        if not voc_file:
+            st.warning("VOC 접수 파일을 업로드해주세요.")
+        elif voc_file and fac_file:
             with st.spinner("데이터 매칭 및 전처리 중..."):
                 try:
                     df_result = load_and_preprocess_data(voc_file, fac_file)
                     st.session_state.matched_df = df_result
-                    st.success(f"✅ 완료! 총 {len(df_result):,}건")
+                    st.success(f"✅ 매칭 완료! 총 {len(df_result):,}건")
                 except Exception as e:
                     st.error(f"❌ {e}")
         else:
-            st.warning("두 파일을 모두 업로드해주세요.")
+            with st.spinner("VOC 파일 로드 중..."):
+                try:
+                    df_result = load_voc_only(voc_file)
+                    st.session_state.matched_df = df_result
+                    st.info(f"📄 VOC 파일만 로드됨 ({len(df_result):,}건) — 시설 파일 없이 텍스트 분석만 가능합니다.")
+                except Exception as e:
+                    st.error(f"❌ {e}")
 
     if st.session_state.matched_df is not None:
         st.markdown("---")

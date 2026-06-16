@@ -53,6 +53,17 @@ def _load_file(file) -> pd.DataFrame:
     return pd.read_csv(file, encoding=enc, dtype=str)
 
 
+def load_voc_only(voc_file) -> pd.DataFrame:
+    """시설 파일 없이 VOC 파일만 로드"""
+    df = _load_file(voc_file).fillna('')
+    df['_matchType'] = ''
+    df['_bizZone']   = ''
+    df['_tel']       = ''
+    df['_cStatusM']  = ''
+    df['_facAddr']   = ''
+    return df
+
+
 def load_and_preprocess_data(voc_file, fac_file) -> pd.DataFrame:
     df_voc = _load_file(voc_file).fillna('')
     df_fac = _load_file(fac_file).fillna('')
