@@ -14,12 +14,14 @@ html, body, [class*="css"]  {
     --text-muted: #94a3b8;
 }
 
-/* Hide Streamlit default elements */
+/* Hide Streamlit default elements (header 전체 숨김 제거 → 사이드바 토글 보존) */
 #MainMenu {visibility: hidden;}
-header {visibility: hidden;}
 footer {visibility: hidden;}
+[data-testid="stToolbar"] {visibility: hidden;}
+[data-testid="stDecoration"] {display: none;}
+.stDeployButton {display: none !important;}
 
-/* 사이드바 토글 버튼은 항상 표시 */
+/* 사이드바 토글 버튼 항상 표시 */
 [data-testid="collapsedControl"] {
     visibility: visible !important;
     display: flex !important;
