@@ -752,13 +752,15 @@ with tab7:
         '_sStatusM': '서비스상태', '_stopDate': '정지일', '_termDate': '해지일',
         '_facAddr': '시설주소', '_mgr': '시설담당자', '_salesName': '영업사원',
     }
-    display_df = df.rename(columns=col_rename)
+    # Norm_* 내부 매칭 키 컬럼 제외 후 rename
+    _hide = [c for c in df.columns if c.startswith('Norm_')]
+    display_df = df.drop(columns=_hide, errors='ignore').rename(columns=col_rename)
     if '매칭유형' in display_df.columns:
         display_df['매칭유형'] = display_df['매칭유형'].map(
             {'svc': '서비스번호', 'cno': '계약번호', 'cust': '고객번호', 'name': '상호명', '': '미매칭'}
         ).fillna('미매칭')
 
-    # 중복 컬럼 제거 (혹시 남아있는 경우 대비)
+    # 중복 컬럼 제거 (안전망)
     display_df = display_df.loc[:, ~display_df.columns.duplicated(keep='first')]
 
     # datetime 컬럼 문자열 정리 (단일 Series 대상만)
