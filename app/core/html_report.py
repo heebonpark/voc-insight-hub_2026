@@ -11,6 +11,19 @@ def _pick_col(df: pd.DataFrame, candidates: list) -> str | None:
     return None
 
 
+# 지사 표시 순서 (요청 고정 순서)
+_BRANCH_ORDER = ['중앙지사', '강북지사', '서대문지사', '고양지사', '의정부지사', '남양주지사', '강릉지사', '원주지사']
+
+
+def _sort_branches(values) -> list:
+    def _key(v):
+        try:
+            return (0, _BRANCH_ORDER.index(v))
+        except ValueError:
+            return (1, v)
+    return sorted(values, key=_key)
+
+
 def generate_html_report(df: pd.DataFrame) -> str:
     """지사·구역·담당 필터 + 지사별 요약 대시보드를 포함한 정적 HTML 리포트 생성.
     지사별 미접수/접수/처리완료/기타 분포와 지사별 점유율을 기본 노출,
@@ -52,7 +65,8 @@ def generate_html_report(df: pd.DataFrame) -> str:
         })
 
     data_json = json.dumps(records, ensure_ascii=False).replace('</script>', '<\\/script>')
-    branches = sorted({r['branch'] for r in records})
+    branch_order_json = json.dumps(_BRANCH_ORDER, ensure_ascii=False)
+    branches = _sort_branches({r['branch'] for r in records})
     zones = sorted({r['zone'] for r in records})
     mgrs = sorted({r['mgr'] for r in records})
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -100,7 +114,7 @@ def generate_html_report(df: pd.DataFrame) -> str:
     <div><label>지사</label>
       <select id="f-branch"><option value="">전체</option>{_opts(branches)}</select>
     </div>
-    <div><label>구역</label>
+    <div><label>담당구역</label>
       <select id="f-zone"><option value="">전체</option>{_opts(zones)}</select>
     </div>
     <div><label>담당</label>
@@ -124,7 +138,7 @@ def generate_html_report(df: pd.DataFrame) -> str:
     <summary>📄 전체 데이터 (펼치기, 최대 2000건 표시)</summary>
     <div class="tablewrap">
       <table id="data-table">
-        <thead><tr><th>지사</th><th>구역</th><th>담당</th><th>상태</th><th>VOC유형</th><th>감성</th><th>리스크</th><th>접수일시</th><th>내용</th></tr></thead>
+        <thead><tr><th>지사</th><th>담당구역</th><th>담당</th><th>상태</th><th>VOC유형</th><th>감성</th><th>리스크</th><th>접수일시</th><th>내용</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -132,12 +146,36 @@ def generate_html_report(df: pd.DataFrame) -> str:
 
 <script>
 const DATA = {data_json};
+const BRANCH_ORDER = {branch_order_json};
+
+function sortBranches(arr) {{
+  return arr.slice().sort((a, b) => {{
+    const ia = BRANCH_ORDER.indexOf(a);
+    const ib = BRANCH_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b, 'ko');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  }});
+}}
 
 function applyFilters() {{
   const b = document.getElementById('f-branch').value;
   const z = document.getElementById('f-zone').value;
   const m = document.getElementById('f-mgr').value;
   return DATA.filter(r => (!b || r.branch === b) && (!z || r.zone === z) && (!m || r.mgr === m));
+}}
+
+// 선택된 지사·담당구역에 속한 담당자만 동적으로 옵션 구성
+function updateMgrOptions() {{
+  const b = document.getElementById('f-branch').value;
+  const z = document.getElementById('f-zone').value;
+  const pool = DATA.filter(r => (!b || r.branch === b) && (!z || r.zone === z));
+  const mgrs = [...new Set(pool.map(r => r.mgr))].sort((a, c) => a.localeCompare(c, 'ko'));
+  const sel = document.getElementById('f-mgr');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">전체</option>' + mgrs.map(m => `<option value="${{m}}">${{m}}</option>`).join('');
+  sel.value = mgrs.includes(prev) ? prev : '';
 }}
 
 function render() {{
@@ -151,7 +189,7 @@ function render() {{
     .map(([l,v]) => `<div class="kpi"><div class="v">${{v.toLocaleString()}}</div><div class="l">${{l}}</div></div>`).join('');
   document.getElementById('kpi-row').innerHTML = kpiHtml;
 
-  const branches = [...new Set(filtered.map(r => r.branch))].sort();
+  const branches = sortBranches([...new Set(filtered.map(r => r.branch))]);
   const states = ['미접수','접수','처리완료','기타'];
   const colors = {{'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'}};
   const traces = states.map(s => ({{
@@ -195,7 +233,12 @@ function render() {{
   ).join('');
 }}
 
-['f-branch','f-zone','f-mgr'].forEach(id => document.getElementById(id).addEventListener('change', render));
+['f-branch', 'f-zone'].forEach(id => document.getElementById(id).addEventListener('change', () => {{
+  updateMgrOptions();
+  render();
+}}));
+document.getElementById('f-mgr').addEventListener('change', render);
+updateMgrOptions();
 render();
 </script>
 </body>
