@@ -372,7 +372,7 @@ _visit_col = next((c for c in df.columns if '방문활동' in c and '여부' in 
 # 청구이의가 0이고 방문활동 데이터가 있으면 해지징후로 대체
 _billing_label = '청구·이의 민원'
 if billing == 0 and _visit_col:
-    _churn_risk = int(df[_visit_col].fillna('').str.contains('해지징후').sum())
+    _churn_risk = int(df[_visit_col].fillna('').str.contains('해지징후 있음').sum())
     if _churn_risk > 0:
         billing = _churn_risk
         _billing_label = '해지징후 감지'
@@ -383,7 +383,7 @@ text_col = next(
 )
 urgent = 0
 if text_col:
-    urgent = int(df[text_col].fillna('').str.contains('감성|불만|빠른연락|긴급|해지징후').sum())
+    urgent = int(df[text_col].fillna('').str.contains('감성|불만|빠른연락|긴급|해지징후 있음').sum())
 # 방문활동 미완료 건수도 긴급 카운트에 포함
 if _visit_col:
     _not_done = int(

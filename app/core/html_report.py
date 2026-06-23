@@ -129,6 +129,19 @@ def generate_html_report(df: pd.DataFrame) -> str:
     <div class="card"><div id="chart-share"></div></div>
   </div>
 
+  <div id="mgr-section" style="display:none;">
+    <h2 style="font-size:1.15rem; margin:4px 0 12px;">👤 담당별 상세 분석 — <span id="mgr-section-branch"></span></h2>
+    <div class="charts">
+      <div class="card"><div id="chart-mgr-status"></div></div>
+      <div class="card"><div id="chart-mgr-volume"></div></div>
+    </div>
+    <div class="charts">
+      <div class="card"><div id="chart-mgr-share"></div></div>
+      <div class="card"><div id="chart-mgr-risk"></div></div>
+    </div>
+    <div class="card" style="margin-bottom:24px;"><div id="chart-mgr-rate"></div></div>
+  </div>
+
   <details>
     <summary>📋 VOC 유형 · 감성 · 리스크 요약 (펼치기)</summary>
     <div id="extra-summary"></div>
@@ -231,6 +244,78 @@ function render() {{
     <tr><td>${{r.branch}}</td><td>${{r.zone}}</td><td>${{r.mgr}}</td><td>${{r.state}}</td>
     <td>${{r.vtype}}</td><td>${{r.sent}}</td><td>${{r.risk}}</td><td>${{r.date}}</td><td>${{r.content}}</td></tr>`
   ).join('');
+
+  renderMgrCharts();
+}}
+
+// 지사 선택 시 해당 지사 내 담당자별 5종 시각화 표시
+function renderMgrCharts() {{
+  const branch = document.getElementById('f-branch').value;
+  const zone = document.getElementById('f-zone').value;
+  const section = document.getElementById('mgr-section');
+
+  if (!branch) {{ section.style.display = 'none'; return; }}
+  section.style.display = 'block';
+  document.getElementById('mgr-section-branch').textContent = branch;
+
+  const pool = DATA.filter(r => r.branch === branch && (!zone || r.zone === zone));
+  const mgrs = [...new Set(pool.map(r => r.mgr))].sort((a, b) => a.localeCompare(b, 'ko'));
+  const states = ['미접수','접수','처리완료','기타'];
+  const colors = {{'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'}};
+  const plotCfg = {{displayModeBar:false, responsive:true}};
+  const baseLayout = {{
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{{color:'#f8fafc'}}, margin:{{t:40}}
+  }};
+
+  // 1. 담당별 처리상태 누적바
+  const traces1 = states.map(s => ({{
+    x: mgrs, y: mgrs.map(m => pool.filter(r => r.mgr===m && r.state===s).length),
+    name: s, type:'bar', marker:{{color: colors[s]}}
+  }}));
+  Plotly.newPlot('chart-mgr-status', traces1, {{
+    ...baseLayout, barmode:'stack', title:'담당별 처리 상태', legend:{{orientation:'h', y:-0.3}}
+  }}, plotCfg);
+
+  // 2. 담당별 총 건수 (내림차순 가로 바)
+  const volumes = mgrs.map(m => ({{m, n: pool.filter(r => r.mgr===m).length}})).sort((a,b) => b.n - a.n);
+  Plotly.newPlot('chart-mgr-volume', [{{
+    x: volumes.map(v=>v.n), y: volumes.map(v=>v.m), type:'bar', orientation:'h', marker:{{color:'#2563eb'}}
+  }}], {{
+    ...baseLayout, title:'담당별 총 건수', margin:{{t:40, l:90}}, yaxis:{{autorange:'reversed'}}
+  }}, plotCfg);
+
+  // 3. 담당별 점유율 도넛
+  Plotly.newPlot('chart-mgr-share', [{{
+    labels: mgrs, values: mgrs.map(m => pool.filter(r=>r.mgr===m).length),
+    type:'pie', hole:0.45, textinfo:'label+percent',
+    marker:{{colors:['#2563eb','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#65a30d','#c026d3','#e11d48','#0ea5e9']}}
+  }}], {{
+    ...baseLayout, title:'담당별 점유율', showlegend:false
+  }}, plotCfg);
+
+  // 4. 담당별 평균 리스크 점수
+  const riskAvg = mgrs.map(m => {{
+    const rows = pool.filter(r => r.mgr===m);
+    const avg = rows.reduce((s,r)=>s+r.risk,0) / (rows.length||1);
+    return {{m, avg}};
+  }}).sort((a,b) => b.avg - a.avg);
+  Plotly.newPlot('chart-mgr-risk', [{{
+    x: riskAvg.map(v=>v.m), y: riskAvg.map(v=>Math.round(v.avg*10)/10), type:'bar', marker:{{color:'#dc2626'}}
+  }}], {{
+    ...baseLayout, title:'담당별 평균 리스크 점수'
+  }}, plotCfg);
+
+  // 5. 담당별 처리완료율(%)
+  const rate = mgrs.map(m => {{
+    const rows = pool.filter(r=>r.mgr===m);
+    const done = rows.filter(r=>r.state==='처리완료').length;
+    return {{m, pct: rows.length ? (done/rows.length*100) : 0}};
+  }}).sort((a,b) => b.pct - a.pct);
+  Plotly.newPlot('chart-mgr-rate', [{{
+    x: rate.map(v=>v.m), y: rate.map(v=>Math.round(v.pct*10)/10), type:'bar', marker:{{color:'#16a34a'}}
+  }}], {{
+    ...baseLayout, title:'담당별 처리완료율(%)', yaxis:{{ticksuffix:'%'}}
+  }}, plotCfg);
 }}
 
 ['f-branch', 'f-zone'].forEach(id => document.getElementById(id).addEventListener('change', () => {{

@@ -39,16 +39,24 @@ _OUTPUT_COLS = [
 ]
 
 
-def _detect_encoding(file) -> str:
-    raw = file.read(8192)
-    file.seek(0)
-    for enc in ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']:
+_CSV_ENCODINGS = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
+
+
+def _read_csv_autodetect(file, **kwargs) -> pd.DataFrame:
+    """인코딩 자동 감지 후 CSV 전체를 읽는다.
+    8192바이트만 잘라 디코딩을 시험하면 UTF-8 멀티바이트 문자가 경계에서
+    잘려 오판될 수 있으므로, pandas로 파일 전체를 직접 읽어 성패를 판단한다.
+    """
+    last_err = None
+    for enc in _CSV_ENCODINGS:
         try:
-            raw.decode(enc)
-            return enc
-        except (UnicodeDecodeError, AttributeError):
+            if hasattr(file, 'seek'):
+                file.seek(0)
+            return pd.read_csv(file, encoding=enc, dtype=str, **kwargs)
+        except (UnicodeDecodeError, pd.errors.ParserError) as e:
+            last_err = e
             continue
-    return 'cp949'
+    raise ValueError(f"CSV 인코딩을 인식할 수 없습니다 ({_CSV_ENCODINGS}): {last_err}")
 
 
 def _find_column(df: pd.DataFrame, aliases: list) -> Optional[str]:
@@ -108,20 +116,7 @@ def _load_file(file, sheet_name=0) -> pd.DataFrame:
     if name.endswith(('.xlsx', '.xls')):
         return pd.read_excel(file, sheet_name=sheet_name, dtype=str)
 
-    # CSV: 경로 문자열이면 인코딩 직접 감지
-    if isinstance(file, str):
-        with open(file, 'rb') as fh:
-            raw = fh.read(8192)
-        for enc in ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']:
-            try:
-                raw.decode(enc)
-                return pd.read_csv(file, encoding=enc, dtype=str)
-            except UnicodeDecodeError:
-                continue
-        return pd.read_csv(file, encoding='cp949', dtype=str)
-
-    enc = _detect_encoding(file)
-    return pd.read_csv(file, encoding=enc, dtype=str)
+    return _read_csv_autodetect(file)
 
 
 def load_voc_only(voc_file, sheet_name=0) -> pd.DataFrame:
