@@ -9,6 +9,7 @@ from app.ui.components import load_css, render_metric
 from app.core.handlers import (
     load_and_preprocess_data, load_voc_only, get_excel_sheets,
 )
+from app.core.html_report import generate_html_report
 from app.core.ml_models import (
     extract_keywords, extract_topics_lda, cluster_vocs,
     detect_anomalies, analyze_sentiment_rule,
@@ -837,12 +838,33 @@ with tab7:
     with pd.ExcelWriter(buf, engine='openpyxl') as writer:
         display_df.to_excel(writer, index=False, sheet_name='VOC분석결과')
     buf.seek(0)
-    st.download_button(
-        label="📥 Excel 다운로드",
-        data=buf,
-        file_name="voc_분석결과.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+
+    dl1, dl2 = st.columns(2)
+    with dl1:
+        st.download_button(
+            label="📥 Excel 다운로드",
+            data=buf,
+            file_name="voc_분석결과.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with dl2:
+        with st.spinner("HTML 리포트 생성 중..."):
+            _report_df = cached_scores(df.to_json(), text_col)
+            sents_report = cached_sentiment_rule(
+                tuple(_report_df[_analysis_col].fillna('').astype(str).tolist())
+                if _analysis_col in _report_df.columns
+                else tuple(_report_df.get(text_col, pd.Series(dtype=str)).fillna('').astype(str).tolist())
+            )
+            _report_df['_감성'] = sents_report
+            html_report = generate_html_report(_report_df)
+        st.download_button(
+            label="📄 지사별 HTML 리포트 다운로드",
+            data=html_report.encode('utf-8'),
+            file_name="voc_지사별_리포트.html",
+            mime="text/html",
+            use_container_width=True,
+        )
 
     search_q = st.text_input("🔍 내용 검색", placeholder="검색어를 입력하세요...")
     if search_q and text_col in display_df.columns:
