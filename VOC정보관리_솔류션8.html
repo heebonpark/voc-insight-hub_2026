@@ -648,7 +648,10 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
 
   <div id="bsMgrSection" style="display:none;margin-bottom:14px">
     <div class="bs-mgr-title">👤 담당별 상세 분석 — <span id="bsMgrBranchName"></span>
-      <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">(이름 클릭 또는 차트 막대 클릭 → 심층 분석)</span>
+      <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">(소속 담당자 전체 표시, VOC 0건 포함 · 행/이름/막대 클릭 → 심층 분석)</span>
+    </div>
+    <div class="cc" style="margin-bottom:12px;overflow-x:auto">
+      <div id="bsMgrSummaryTable"></div>
     </div>
     <div id="bsMgrChipsRow" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="chrow" style="grid-template-columns:1fr 1fr">
@@ -2241,6 +2244,14 @@ function renderExpertAnalysis(d){
     </div>`).join('') : '<div class="no-data" style="padding:14px">반복 접수 건 없음</div>';
 }
 
+// 담당자 라벨: 매칭된 구역의 실제 소속지사가 화면에서 보는 지사와 다르면 (타지사:OO) 로 구분 표시
+function bsMgrLabel(r, br){
+  const nm = bsMgrOf(r);
+  if(!nm) return '(미지정)';
+  if(br && r._zoneBranch && r._zoneBranch !== br) return `${nm} (타지사:${r._zoneBranch})`;
+  return nm;
+}
+
 function renderMgrSection(){
   const br=document.getElementById('bs_br').value;
   const sec=document.getElementById('bsMgrSection');
@@ -2250,29 +2261,65 @@ function renderMgrSection(){
 
   const zn=document.getElementById('bs_zone').value;
   const pool=ALL.filter(r=>bsNorm(r['관리지사'])===br && (!zn||bsNorm(r._bizZone)===zn));
-  const mgrs=[...new Set(pool.map(r=>bsNorm(bsMgrOf(r))))].sort((a,b)=>a.localeCompare(b,'ko'));
   const states=['미접수','접수','처리완료','기타'];
   const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
 
-  document.getElementById('bsMgrChipsRow').innerHTML = mgrs.map(m=>{
-    const n = pool.filter(r=>bsNorm(bsMgrOf(r))===m).length;
-    return `<button class="mb" onclick="openMgrDetail('${m.replace(/'/g,"\\'")}')">👤 ${esc(m)} <span class="bdg bb" style="margin-left:4px">${n}</span></button>`;
-  }).join('');
+  // ZONE_MAP 기준 해당 지사(·구역) 소속 전체 담당자 로스터 — VOC 0건이어도 누락 없이 포함
+  const roster=[...new Set(Object.entries(ZONE_MAP)
+    .filter(([zcode,z])=>z.branch===br && (!zn||zcode===zn))
+    .map(([,z])=>z.name).filter(Boolean))];
+  const poolLabels=[...new Set(pool.map(r=>bsMgrLabel(r,br)))].filter(m=>m!=='(미지정)');
+  const hasUnassigned=pool.some(r=>bsMgrLabel(r,br)==='(미지정)');
+  const mgrs=[...new Set([...roster,...poolLabels])].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(hasUnassigned) mgrs.push('(미지정)');
+
+  const mgrStats=mgrs.map(m=>{
+    const rows=pool.filter(r=>bsMgrLabel(r,br)===m);
+    const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+    rows.forEach(r=>cnt[bsState(r)]++);
+    return {m,rows,total:rows.length,...cnt};
+  });
+
+  // ── 상단 요약 테이블 (미접수/접수/처리완료/기타 한눈에) ──
+  document.getElementById('bsMgrSummaryTable').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 8px;background:var(--bg2)">담당자</th>
+        <th style="padding:6px 8px;background:var(--bg2)">전체</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--red)">미접수</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--org)">접수</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--grn)">처리완료</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:#64748b">기타</th>
+      </tr></thead>
+      <tbody>${mgrStats.map(s=>`
+        <tr style="cursor:pointer;border-bottom:1px solid var(--bd)" onclick="openMgrDetail('${s.m.replace(/'/g,"\\'")}','${br.replace(/'/g,"\\'")}')">
+          <td style="padding:6px 8px;font-weight:600">${esc(s.m)}${s.total===0?' <span style="color:var(--t3);font-weight:400;font-size:10px">(VOC없음)</span>':''}</td>
+          <td style="padding:6px 8px;text-align:center">${s.total}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:${s['미접수']>0?700:400}">${s['미접수']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--org)">${s['접수']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--grn)">${s['처리완료']}</td>
+          <td style="padding:6px 8px;text-align:center;color:#64748b">${s['기타']}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+
+  document.getElementById('bsMgrChipsRow').innerHTML = mgrStats.map(s=>
+    `<button class="mb" onclick="openMgrDetail('${s.m.replace(/'/g,"\\'")}','${br.replace(/'/g,"\\'")}')">👤 ${esc(s.m)} <span class="bdg bb" style="margin-left:4px">${s.total}</span></button>`
+  ).join('');
 
   if(charts.mgrStatus)charts.mgrStatus.destroy();
   charts.mgrStatus=new Chart(document.getElementById('mgrChartStatus'),{
     type:'bar',
-    data:{labels:mgrs,datasets:states.map(s=>({label:s,data:mgrs.map(m=>pool.filter(r=>bsNorm(bsMgrOf(r))===m&&bsState(r)===s).length),backgroundColor:stColors[s]}))},
+    data:{labels:mgrs,datasets:states.map(s=>({label:s,data:mgrStats.map(ms=>ms[s]),backgroundColor:stColors[s]}))},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:9}}}},scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
   });
 
-  const volumes=mgrs.map(m=>({m,n:pool.filter(r=>bsNorm(bsMgrOf(r))===m).length})).sort((a,b)=>b.n-a.n);
+  const volumes=mgrStats.map(s=>({m:s.m,n:s.total})).sort((a,b)=>b.n-a.n);
   if(charts.mgrVolume)charts.mgrVolume.destroy();
   charts.mgrVolume=new Chart(document.getElementById('mgrChartVolume'),{
     type:'bar',
     data:{labels:volumes.map(v=>v.m),datasets:[{data:volumes.map(v=>v.n),backgroundColor:'#2563eb',borderRadius:3,barThickness:13}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:9}}}},
-      onClick:(evt,els)=>{ if(els.length){ openMgrDetail(volumes[els[0].index].m); } },
+      onClick:(evt,els)=>{ if(els.length){ openMgrDetail(volumes[els[0].index].m, br); } },
       onHover:(evt,els)=>{ evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
     }
   });
@@ -2280,15 +2327,11 @@ function renderMgrSection(){
   if(charts.mgrShare)charts.mgrShare.destroy();
   charts.mgrShare=new Chart(document.getElementById('mgrChartShare'),{
     type:'doughnut',
-    data:{labels:mgrs,datasets:[{data:mgrs.map(m=>pool.filter(r=>bsNorm(bsMgrOf(r))===m).length),backgroundColor:bsPalette(mgrs.length),borderWidth:1,borderColor:'#fff'}]},
+    data:{labels:mgrs,datasets:[{data:mgrStats.map(s=>s.total),backgroundColor:bsPalette(mgrs.length),borderWidth:1,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:9}}}}}
   });
 
-  const riskAvg=mgrs.map(m=>{
-    const rows=pool.filter(r=>bsNorm(bsMgrOf(r))===m);
-    const avg=rows.length?rows.reduce((s,r)=>s+calcR(r),0)/rows.length:0;
-    return {m,avg};
-  }).sort((a,b)=>b.avg-a.avg);
+  const riskAvg=mgrStats.map(s=>({m:s.m,avg:s.total?s.rows.reduce((sum,r)=>sum+calcR(r),0)/s.total:0})).sort((a,b)=>b.avg-a.avg);
   if(charts.mgrRisk)charts.mgrRisk.destroy();
   charts.mgrRisk=new Chart(document.getElementById('mgrChartRisk'),{
     type:'bar',
@@ -2296,11 +2339,7 @@ function renderMgrSection(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{font:{size:9}}}}}
   });
 
-  const rate=mgrs.map(m=>{
-    const rows=pool.filter(r=>bsNorm(bsMgrOf(r))===m);
-    const done=rows.filter(r=>r['상태']==='처리완료').length;
-    return {m,pct:rows.length?done/rows.length*100:0};
-  }).sort((a,b)=>b.pct-a.pct);
+  const rate=mgrStats.map(s=>({m:s.m,pct:s.total?s['처리완료']/s.total*100:0})).sort((a,b)=>b.pct-a.pct);
   if(charts.mgrRate)charts.mgrRate.destroy();
   charts.mgrRate=new Chart(document.getElementById('mgrChartRate'),{
     type:'bar',
@@ -2311,9 +2350,10 @@ function renderMgrSection(){
 
 // ── 담당자 심층 분석 모달 (이름/막대 클릭 시 뎁스 있는 분석) ──
 let MGR_DETAIL_VOCS = [];
-function openMgrDetail(mgrName){
+function openMgrDetail(mgrName, br){
+  br = br || document.getElementById('bs_br').value;
   const scope = bsFiltered();  // 대시보드 현재 필터 범위 내에서 심층분석
-  const rows = scope.filter(r=>bsNorm(bsMgrOf(r))===mgrName);
+  const rows = scope.filter(r=>bsMgrLabel(r,br)===mgrName);
   MGR_DETAIL_VOCS = rows;
   const total = rows.length;
   const sample = rows[0]||{};
@@ -2323,7 +2363,9 @@ function openMgrDetail(mgrName){
   const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
 
   document.getElementById('mgrDetailTitle').textContent = `👤 ${mgrName} 담당자 심층 분석`;
-  document.getElementById('mgrDetailSub').textContent = `${sample._zoneBranch||sample['관리지사']||'-'} · 구역 ${sample._bizZone||'-'} · 총 ${total}건 (현재 대시보드 필터 적용)`;
+  document.getElementById('mgrDetailSub').textContent = total
+    ? `${sample._zoneBranch||sample['관리지사']||'-'} · 구역 ${sample._bizZone||'-'} · 총 ${total}건 (현재 대시보드 필터 적용)`
+    : `${br||'-'} 소속 담당자 · 현재 필터 범위 내 배정된 VOC 없음`;
 
   document.getElementById('mgrDetailKpi').innerHTML = `
     <div class="kpi"><div class="kl">총건수</div><div class="kv">${total}</div></div>
