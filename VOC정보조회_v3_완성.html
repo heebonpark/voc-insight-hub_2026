@@ -86,6 +86,12 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:var(--bg)
 .ch-card h4{font-size:12px;font-weight:700;color:var(--t2);margin-bottom:9px}
 .ch-wrap{position:relative;width:100%;height:150px}
 
+/* 지사별 요약 대시보드 (신규) */
+.bs-collapse{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:13px 15px;margin-top:2px;margin-bottom:14px}
+.bs-collapse summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--t2);outline:none}
+.bs-collapse[open] summary{margin-bottom:8px}
+.bs-mgr-title{font-size:12px;font-weight:700;color:var(--t2);margin:4px 0 9px}
+
 /* TABLE */
 .tbl-card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
 .tbl-hd{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--bd)}
@@ -223,16 +229,57 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
 
 <!-- PAGE: DASHBOARD -->
 <div class="page active" id="page-dash">
-  <div class="kpi-row" id="kpiBar"></div>
-  <div class="ai-box" id="aiBox" style="display:none">
-    <div class="ai-hd">🤖 AI 자동 인사이트</div>
-    <ul id="aiList"></ul>
+
+  <!-- ▼ 지사별 요약 대시보드 (최상단, 기본 노출) ▼ -->
+  <div class="flt-panel">
+    <div class="flt-title">🏢 지사별 요약 대시보드</div>
+    <div class="flt-grid" style="grid-template-columns:repeat(3,minmax(160px,1fr))">
+      <div class="fg"><label>지사</label>
+        <select id="bs_br" onchange="onBsBranchChange()"><option value="">전체</option></select>
+      </div>
+      <div class="fg"><label>담당구역</label>
+        <select id="bs_zone" onchange="onBsZoneChange()"><option value="">전체</option></select>
+      </div>
+      <div class="fg"><label>담당</label>
+        <select id="bs_mgr" onchange="renderBranchSummary()"><option value="">전체</option></select>
+      </div>
+    </div>
   </div>
-  <div class="ch-row">
-    <div class="ch-card"><h4>📊 VOC유형대 분포</h4><div class="ch-wrap"><canvas id="cType" role="img" aria-label="VOC유형대 분포">VOC유형대 분포</canvas></div><div id="typeLeg" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;font-size:10px"></div></div>
-    <div class="ch-card"><h4>🏢 지사별 현황</h4><div class="ch-wrap"><canvas id="cBranch" role="img" aria-label="지사별">지사별</canvas></div></div>
-    <div class="ch-card"><h4>🔗 시설매칭 계약상태</h4><div class="ch-wrap"><canvas id="cState" role="img" aria-label="계약상태">계약상태</canvas></div></div>
+
+  <div class="kpi-row" id="bsKpi"></div>
+
+  <div class="ch-row" style="grid-template-columns:1.4fr 1fr">
+    <div class="ch-card"><h4>지사별 처리 상태 분포</h4><div class="ch-wrap" style="height:210px"><canvas id="bsChartStatus"></canvas></div></div>
+    <div class="ch-card"><h4>지사별 점유율</h4><div class="ch-wrap" style="height:210px"><canvas id="bsChartShare"></canvas></div></div>
   </div>
+
+  <div id="bsMgrSection" style="display:none;margin-bottom:14px">
+    <div class="bs-mgr-title">👤 담당별 상세 분석 — <span id="bsMgrBranchName"></span></div>
+    <div class="ch-row" style="grid-template-columns:1fr 1fr">
+      <div class="ch-card"><h4>담당별 처리 상태</h4><div class="ch-wrap" style="height:190px"><canvas id="mgrChartStatus"></canvas></div></div>
+      <div class="ch-card"><h4>담당별 총 건수</h4><div class="ch-wrap" style="height:190px"><canvas id="mgrChartVolume"></canvas></div></div>
+    </div>
+    <div class="ch-row" style="grid-template-columns:1fr 1fr">
+      <div class="ch-card"><h4>담당별 점유율</h4><div class="ch-wrap" style="height:190px"><canvas id="mgrChartShare"></canvas></div></div>
+      <div class="ch-card"><h4>담당별 평균 리스크 점수</h4><div class="ch-wrap" style="height:190px"><canvas id="mgrChartRisk"></canvas></div></div>
+    </div>
+    <div class="ch-card" style="margin-bottom:0"><h4>담당별 처리완료율(%)</h4><div class="ch-wrap" style="height:190px"><canvas id="mgrChartRate"></canvas></div></div>
+  </div>
+  <!-- ▲ 지사별 요약 대시보드 끝 ▲ -->
+
+  <details class="bs-collapse">
+    <summary>📊 전체 KPI · 분포 분석 상세 (펼치기/접기)</summary>
+    <div class="kpi-row" id="kpiBar"></div>
+    <div class="ai-box" id="aiBox" style="display:none">
+      <div class="ai-hd">🤖 AI 자동 인사이트</div>
+      <ul id="aiList"></ul>
+    </div>
+    <div class="ch-row">
+      <div class="ch-card"><h4>📊 VOC유형대 분포</h4><div class="ch-wrap"><canvas id="cType" role="img" aria-label="VOC유형대 분포">VOC유형대 분포</canvas></div><div id="typeLeg" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;font-size:10px"></div></div>
+      <div class="ch-card"><h4>🏢 지사별 현황</h4><div class="ch-wrap"><canvas id="cBranch" role="img" aria-label="지사별">지사별</canvas></div></div>
+      <div class="ch-card"><h4>🔗 시설매칭 계약상태</h4><div class="ch-wrap"><canvas id="cState" role="img" aria-label="계약상태">계약상태</canvas></div></div>
+    </div>
+  </details>
 </div>
 
 <!-- PAGE: LIST -->
@@ -640,6 +687,8 @@ function renderKPI(){
 
 // ═══ DASHBOARD ═══
 function renderDash(){
+  buildBsSelects();
+  renderBranchSummary();
   renderKPI();
   // AI insight
   const ai=[];
@@ -681,6 +730,152 @@ function renderCharts(){
   charts.state=new Chart(document.getElementById('cState'),{type:'bar',data:{labels:sL,datasets:[{data:sD,backgroundColor:sL.map(l=>sCLR[l]||'#94a3b8'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,color:'#9ca3af'},grid:{color:'#f1f5f9'}},x:{ticks:{color:'#6b7280',font:{size:10}},grid:{display:false}}}}});
 }
 function setVT(v){showPage('list',document.querySelectorAll('.tn')[1]);document.getElementById('f_vt').value=v;applyFilter();}
+
+// ═══ 지사별 요약 대시보드 (신규) ═══
+const BS_BRANCH_ORDER=['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
+function bsSortBranches(arr){
+  return arr.slice().sort((a,b)=>{
+    const ia=BS_BRANCH_ORDER.indexOf(a),ib=BS_BRANCH_ORDER.indexOf(b);
+    if(ia===-1&&ib===-1) return a.localeCompare(b,'ko');
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia-ib;
+  });
+}
+function bsNorm(v){return (v||'').trim()||'(미지정)';}
+function bsState(r){const s=r['상태'];return ['미접수','접수','처리완료'].includes(s)?s:'기타';}
+function bsPalette(n){const out=[];for(let i=0;i<n;i++)out.push(CLR[i%CLR.length]);return out;}
+
+function buildBsSelects(){
+  const brSet=new Set(ALL.map(r=>bsNorm(r['관리지사'])));
+  const brSel=document.getElementById('bs_br');
+  const curBr=brSel.value;
+  brSel.innerHTML='<option value="">전체</option>'+bsSortBranches([...brSet]).map(b=>`<option value="${b}">${b}</option>`).join('');
+  if([...brSet].includes(curBr)) brSel.value=curBr;
+  updateBsZoneSelect();
+}
+function updateBsZoneSelect(){
+  const br=document.getElementById('bs_br').value;
+  const pool=ALL.filter(r=>!br||bsNorm(r['관리지사'])===br);
+  const zones=[...new Set(pool.map(r=>bsNorm(r._bizZone)))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const sel=document.getElementById('bs_zone'),cur=sel.value;
+  sel.innerHTML='<option value="">전체</option>'+zones.map(z=>`<option value="${z}">${z}</option>`).join('');
+  sel.value=zones.includes(cur)?cur:'';
+  updateBsMgrSelect();
+}
+function updateBsMgrSelect(){
+  const br=document.getElementById('bs_br').value,zn=document.getElementById('bs_zone').value;
+  const pool=ALL.filter(r=>(!br||bsNorm(r['관리지사'])===br)&&(!zn||bsNorm(r._bizZone)===zn));
+  const mgrs=[...new Set(pool.map(r=>bsNorm(r._mgr)))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const sel=document.getElementById('bs_mgr'),cur=sel.value;
+  sel.innerHTML='<option value="">전체</option>'+mgrs.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value=mgrs.includes(cur)?cur:'';
+}
+function onBsBranchChange(){ updateBsZoneSelect(); renderBranchSummary(); }
+function onBsZoneChange(){ updateBsMgrSelect(); renderBranchSummary(); }
+
+function bsFiltered(){
+  const br=document.getElementById('bs_br').value,zn=document.getElementById('bs_zone').value,mg=document.getElementById('bs_mgr').value;
+  return ALL.filter(r=>
+    (!br||bsNorm(r['관리지사'])===br) &&
+    (!zn||bsNorm(r._bizZone)===zn) &&
+    (!mg||bsNorm(r._mgr)===mg)
+  );
+}
+
+function renderBranchSummary(){
+  const d=bsFiltered(),total=d.length;
+  const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+  d.forEach(r=>cnt[bsState(r)]++);
+  document.getElementById('bsKpi').innerHTML=`
+    <div class="kpi"><div class="kpi-label">전체</div><div class="kpi-val">${total}</div></div>
+    <div class="kpi b4"><div class="kpi-label">미접수</div><div class="kpi-val" style="color:var(--red)">${cnt['미접수']}</div></div>
+    <div class="kpi b2"><div class="kpi-label">접수</div><div class="kpi-val" style="color:var(--org)">${cnt['접수']}</div></div>
+    <div class="kpi b3"><div class="kpi-label">처리완료</div><div class="kpi-val" style="color:var(--green)">${cnt['처리완료']}</div></div>
+    <div class="kpi b7"><div class="kpi-label">기타</div><div class="kpi-val" style="color:#64748b">${cnt['기타']}</div></div>
+  `;
+
+  const branches=bsSortBranches([...new Set(d.map(r=>bsNorm(r['관리지사'])))]);
+  const states=['미접수','접수','처리완료','기타'];
+  const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
+
+  if(charts.bsStatus)charts.bsStatus.destroy();
+  charts.bsStatus=new Chart(document.getElementById('bsChartStatus'),{
+    type:'bar',
+    data:{labels:branches.map(b=>b.replace('지사','')),datasets:states.map(s=>({label:s,data:branches.map(b=>d.filter(r=>bsNorm(r['관리지사'])===b&&bsState(r)===s).length),backgroundColor:stColors[s]}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:10}}}},scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  const shareData=branches.map(b=>d.filter(r=>bsNorm(r['관리지사'])===b).length);
+  if(charts.bsShare)charts.bsShare.destroy();
+  charts.bsShare=new Chart(document.getElementById('bsChartShare'),{
+    type:'doughnut',
+    data:{labels:branches.map(b=>b.replace('지사','')),datasets:[{data:shareData,backgroundColor:bsPalette(branches.length),borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:10}}}}}
+  });
+
+  renderMgrSection();
+}
+
+function renderMgrSection(){
+  const br=document.getElementById('bs_br').value;
+  const sec=document.getElementById('bsMgrSection');
+  if(!br){ sec.style.display='none'; return; }
+  sec.style.display='';
+  document.getElementById('bsMgrBranchName').textContent=br;
+
+  const zn=document.getElementById('bs_zone').value;
+  const pool=ALL.filter(r=>bsNorm(r['관리지사'])===br && (!zn||bsNorm(r._bizZone)===zn));
+  const mgrs=[...new Set(pool.map(r=>bsNorm(r._mgr)))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const states=['미접수','접수','처리완료','기타'];
+  const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
+
+  if(charts.mgrStatus)charts.mgrStatus.destroy();
+  charts.mgrStatus=new Chart(document.getElementById('mgrChartStatus'),{
+    type:'bar',
+    data:{labels:mgrs,datasets:states.map(s=>({label:s,data:mgrs.map(m=>pool.filter(r=>bsNorm(r._mgr)===m&&bsState(r)===s).length),backgroundColor:stColors[s]}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:9}}}},scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+
+  const volumes=mgrs.map(m=>({m,n:pool.filter(r=>bsNorm(r._mgr)===m).length})).sort((a,b)=>b.n-a.n);
+  if(charts.mgrVolume)charts.mgrVolume.destroy();
+  charts.mgrVolume=new Chart(document.getElementById('mgrChartVolume'),{
+    type:'bar',
+    data:{labels:volumes.map(v=>v.m),datasets:[{data:volumes.map(v=>v.n),backgroundColor:'#2563eb',borderRadius:3,barThickness:13}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:9}}}}}
+  });
+
+  if(charts.mgrShare)charts.mgrShare.destroy();
+  charts.mgrShare=new Chart(document.getElementById('mgrChartShare'),{
+    type:'doughnut',
+    data:{labels:mgrs,datasets:[{data:mgrs.map(m=>pool.filter(r=>bsNorm(r._mgr)===m).length),backgroundColor:bsPalette(mgrs.length),borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:9}}}}}
+  });
+
+  const riskAvg=mgrs.map(m=>{
+    const rows=pool.filter(r=>bsNorm(r._mgr)===m);
+    const avg=rows.length?rows.reduce((s,r)=>s+calcRisk(r),0)/rows.length:0;
+    return {m,avg};
+  }).sort((a,b)=>b.avg-a.avg);
+  if(charts.mgrRisk)charts.mgrRisk.destroy();
+  charts.mgrRisk=new Chart(document.getElementById('mgrChartRisk'),{
+    type:'bar',
+    data:{labels:riskAvg.map(v=>v.m),datasets:[{data:riskAvg.map(v=>Math.round(v.avg*10)/10),backgroundColor:'#dc2626',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true},x:{ticks:{font:{size:9}}}}}
+  });
+
+  const rate=mgrs.map(m=>{
+    const rows=pool.filter(r=>bsNorm(r._mgr)===m);
+    const done=rows.filter(r=>r['상태']==='처리완료').length;
+    return {m,pct:rows.length?done/rows.length*100:0};
+  }).sort((a,b)=>b.pct-a.pct);
+  if(charts.mgrRate)charts.mgrRate.destroy();
+  charts.mgrRate=new Chart(document.getElementById('mgrChartRate'),{
+    type:'bar',
+    data:{labels:rate.map(v=>v.m),datasets:[{data:rate.map(v=>Math.round(v.pct*10)/10),backgroundColor:'#16a34a',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},x:{ticks:{font:{size:9}}}}}
+  });
+}
 
 // ═══ TABLE ═══
 const MATCH_LABEL={svc:'🔑서비스',cno:'📄계약',cust:'👤고객',name:'🏪상호'};
