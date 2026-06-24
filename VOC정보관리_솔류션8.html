@@ -481,6 +481,61 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
   </div>
 </div>
 
+<!-- ══════════ DUP DETAIL MODAL (중복시설 세부내역) ══════════ -->
+<div class="ov" id="dupDetailOv" onclick="if(event.target===this)closeDupDetail()">
+  <div class="modal" style="width:920px">
+    <div class="mhd">
+      <div><div id="dupDetailTitle" style="font-size:16px;font-weight:700">중복시설 세부내역</div><div id="dupDetailSub" style="font-size:12px;color:var(--t3);margin-top:2px"></div></div>
+      <button class="mc" onclick="closeDupDetail()">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="ds">
+        <h4>📊 행별 필드 비교 <span style="font-size:11px;font-weight:400;color:var(--org)">(값이 다른 필드는 ⚠️ 강조)</span></h4>
+        <div id="dupDetailTable" style="overflow-x:auto;max-height:320px;overflow-y:auto;border:1px solid var(--bd);border-radius:var(--rs)"></div>
+      </div>
+      <div class="ds" style="margin-top:14px">
+        <h4>🔗 연관 VOC 목록 <span style="font-size:11px;font-weight:400;color:var(--t3)">(클릭하여 VOC 상세보기)</span></h4>
+        <div id="dupDetailVocList" style="max-height:240px;overflow-y:auto;border:1px solid var(--bd);border-radius:var(--rs)"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MGR DETAIL MODAL (담당자 심층 분석) ══════════ -->
+<div class="ov" id="mgrDetailOv" onclick="if(event.target===this)closeMgrDetail()">
+  <div class="modal" style="width:920px">
+    <div class="mhd">
+      <div><div id="mgrDetailTitle" style="font-size:16px;font-weight:700">담당자 심층 분석</div><div id="mgrDetailSub" style="font-size:12px;color:var(--t3);margin-top:2px"></div></div>
+      <button class="mc" onclick="closeMgrDetail()">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="krow" id="mgrDetailKpi" style="margin-bottom:14px"></div>
+      <div class="dg" style="margin-bottom:14px">
+        <div class="cc"><h4>VOC유형 분포</h4><div class="cw" style="height:180px"><canvas id="mgrDetailChartType"></canvas></div></div>
+        <div class="cc"><h4>일자별 접수 추이</h4><div class="cw" style="height:180px"><canvas id="mgrDetailChartTrend"></canvas></div></div>
+      </div>
+      <div class="ds">
+        <h4>🔥 고위험 TOP5 <span style="font-size:11px;font-weight:400;color:var(--t3)">(클릭하여 상세보기)</span></h4>
+        <div id="mgrDetailRiskList" style="border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:14px"></div>
+      </div>
+      <div class="ds">
+        <h4>📋 전체 VOC 목록 <span style="font-size:11px;font-weight:400;color:var(--t3)">(클릭하여 상세보기)</span></h4>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--bd);border-radius:var(--rs)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">상태</th>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">상호/고객명</th>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">VOC유형</th>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">접수일시</th>
+            </tr></thead>
+            <tbody id="mgrDetailVocList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ SHARE EXPORT MODAL ══════════ -->
 <div class="ov" id="shareExportOv" onclick="if(event.target===this)closeShareExport()">
   <div class="modal" style="width:460px">
@@ -592,10 +647,13 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
   <!-- ▲ 전문가 분석 4종 끝 ▲ -->
 
   <div id="bsMgrSection" style="display:none;margin-bottom:14px">
-    <div class="bs-mgr-title">👤 담당별 상세 분석 — <span id="bsMgrBranchName"></span></div>
+    <div class="bs-mgr-title">👤 담당별 상세 분석 — <span id="bsMgrBranchName"></span>
+      <span style="font-weight:400;color:var(--t3);font-size:11px;margin-left:6px">(이름 클릭 또는 차트 막대 클릭 → 심층 분석)</span>
+    </div>
+    <div id="bsMgrChipsRow" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div class="chrow" style="grid-template-columns:1fr 1fr">
       <div class="cc"><h4>담당별 처리 상태</h4><div class="cw" style="height:190px"><canvas id="mgrChartStatus"></canvas></div></div>
-      <div class="cc"><h4>담당별 총 건수</h4><div class="cw" style="height:190px"><canvas id="mgrChartVolume"></canvas></div></div>
+      <div class="cc"><h4>담당별 총 건수 <span style="font-weight:400;font-size:9px;color:var(--t3)">(막대 클릭)</span></h4><div class="cw" style="height:190px"><canvas id="mgrChartVolume"></canvas></div></div>
     </div>
     <div class="chrow" style="grid-template-columns:1fr 1fr">
       <div class="cc"><h4>담당별 점유율</h4><div class="cw" style="height:190px"><canvas id="mgrChartShare"></canvas></div></div>
@@ -2196,6 +2254,11 @@ function renderMgrSection(){
   const states=['미접수','접수','처리완료','기타'];
   const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
 
+  document.getElementById('bsMgrChipsRow').innerHTML = mgrs.map(m=>{
+    const n = pool.filter(r=>bsNorm(bsMgrOf(r))===m).length;
+    return `<button class="mb" onclick="openMgrDetail('${m.replace(/'/g,"\\'")}')">👤 ${esc(m)} <span class="bdg bb" style="margin-left:4px">${n}</span></button>`;
+  }).join('');
+
   if(charts.mgrStatus)charts.mgrStatus.destroy();
   charts.mgrStatus=new Chart(document.getElementById('mgrChartStatus'),{
     type:'bar',
@@ -2208,7 +2271,10 @@ function renderMgrSection(){
   charts.mgrVolume=new Chart(document.getElementById('mgrChartVolume'),{
     type:'bar',
     data:{labels:volumes.map(v=>v.m),datasets:[{data:volumes.map(v=>v.n),backgroundColor:'#2563eb',borderRadius:3,barThickness:13}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:9}}}}}
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1}},y:{ticks:{font:{size:9}}}},
+      onClick:(evt,els)=>{ if(els.length){ openMgrDetail(volumes[els[0].index].m); } },
+      onHover:(evt,els)=>{ evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+    }
   });
 
   if(charts.mgrShare)charts.mgrShare.destroy();
@@ -2242,6 +2308,75 @@ function renderMgrSection(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}},x:{ticks:{font:{size:9}}}}}
   });
 }
+
+// ── 담당자 심층 분석 모달 (이름/막대 클릭 시 뎁스 있는 분석) ──
+let MGR_DETAIL_VOCS = [];
+function openMgrDetail(mgrName){
+  const scope = bsFiltered();  // 대시보드 현재 필터 범위 내에서 심층분석
+  const rows = scope.filter(r=>bsNorm(bsMgrOf(r))===mgrName);
+  MGR_DETAIL_VOCS = rows;
+  const total = rows.length;
+  const sample = rows[0]||{};
+
+  const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+  rows.forEach(r=>cnt[bsState(r)]++);
+  const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
+
+  document.getElementById('mgrDetailTitle').textContent = `👤 ${mgrName} 담당자 심층 분석`;
+  document.getElementById('mgrDetailSub').textContent = `${sample._zoneBranch||sample['관리지사']||'-'} · 구역 ${sample._bizZone||'-'} · 총 ${total}건 (현재 대시보드 필터 적용)`;
+
+  document.getElementById('mgrDetailKpi').innerHTML = `
+    <div class="kpi"><div class="kl">총건수</div><div class="kv">${total}</div></div>
+    <div class="kpi b4"><div class="kl">미접수</div><div class="kv" style="color:var(--red)">${cnt['미접수']}</div></div>
+    <div class="kpi b2"><div class="kl">접수</div><div class="kv" style="color:var(--org)">${cnt['접수']}</div></div>
+    <div class="kpi b3"><div class="kl">처리완료</div><div class="kv" style="color:var(--grn)">${cnt['처리완료']}</div></div>
+    <div class="kpi b5"><div class="kl">평균리스크</div><div class="kv" style="color:var(--pur)">${avgRisk}</div></div>
+  `;
+
+  const byType={};
+  rows.forEach(r=>{const v=r['VOC유형대']||'미상';byType[v]=(byType[v]||0)+1;});
+  if(charts.mgrDetailType)charts.mgrDetailType.destroy();
+  charts.mgrDetailType=new Chart(document.getElementById('mgrDetailChartType'),{
+    type:'doughnut',
+    data:{labels:Object.keys(byType),datasets:[{data:Object.values(byType),backgroundColor:CLR,borderWidth:1,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:9,font:{size:9}}}}}
+  });
+
+  const byDate={};
+  rows.forEach(r=>{const dt=(r['접수일시']||'').slice(0,10);if(dt)byDate[dt]=(byDate[dt]||0)+1;});
+  const dates=Object.keys(byDate).sort();
+  if(charts.mgrDetailTrend)charts.mgrDetailTrend.destroy();
+  charts.mgrDetailTrend=new Chart(document.getElementById('mgrDetailChartTrend'),{
+    type:'line',
+    data:{labels:dates,datasets:[{label:'접수건수',data:dates.map(d=>byDate[d]),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.15)',fill:true,tension:0.3,pointRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{ticks:{font:{size:9}}}}}
+  });
+
+  const riskTop=rows.map(r=>({r,score:calcR(r)})).sort((a,b)=>b.score-a.score).slice(0,5);
+  document.getElementById('mgrDetailRiskList').innerHTML = riskTop.length ? riskTop.map(({r,score})=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openMgrRelatedVoc(${rows.indexOf(r)})">
+      <span class="bdg ${score>=20?'br':score>=10?'bo':'bgr'}">${score}점</span>
+      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r['상호']||r['고객명']||'미상')}</span>
+      <span style="font-size:10px;color:var(--t3)">${esc(r['VOC유형대']||'')}</span>
+    </div>`).join('') : '<div class="no-data" style="padding:10px">데이터 없음</div>';
+
+  document.getElementById('mgrDetailVocList').innerHTML = rows.length ? rows.map((r,i)=>`
+    <tr style="cursor:pointer" onclick="openMgrRelatedVoc(${i})">
+      <td style="padding:5px 8px"><span class="bdg ${SC[r['상태']]||'bgr'}" style="font-size:10px">${r['상태']||'-'}</span></td>
+      <td style="padding:5px 8px;font-size:11px">${esc(r['상호']||r['고객명']||'-')}</td>
+      <td style="padding:5px 8px;font-size:11px">${esc(r['VOC유형대']||'-')}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--t3)">${esc(r['접수일시']||'-')}</td>
+    </tr>`).join('') : '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>';
+
+  document.getElementById('mgrDetailOv').classList.add('on');
+}
+function openMgrRelatedVoc(i){
+  const r=MGR_DETAIL_VOCS[i];
+  if(!r)return;
+  closeMgrDetail();
+  openDbyR(r);
+}
+function closeMgrDetail(){ document.getElementById('mgrDetailOv').classList.remove('on'); }
 
 // ══ TABLE ══
 const ML={svc:'🔑서비스',cno:'📄계약',cust:'👤고객'};
@@ -4071,13 +4206,63 @@ function renderDupList(){
       '<span>영업자: ' + (rec.sl||'-') + '</span>' +
       '</div>'
     ).join('');
-    return '<div style="border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:10px;overflow:hidden">' +
+    const safeKey = key.replace(/'/g,"\\'");
+    return '<div style="border:1px solid var(--bd);border-radius:var(--rs);margin-bottom:10px;overflow:hidden;cursor:pointer" onclick="openDupDetail(\'' + safeKey + '\',\'' + DUP_TAB + '\')">' +
       '<div style="background:var(--o2);padding:7px 11px;display:flex;align-items:center;gap:7px">' +
       '<span style="font-weight:700;font-size:12px;color:var(--org)">' + label + ': ' + key + '</span>' +
-      '<span class="bdg bo" style="margin-left:auto">' + rows.length + '개 행</span>' +
+      '<span class="bdg bo">' + rows.length + '개 행</span>' +
+      '<span style="margin-left:auto;font-size:11px;color:var(--blue);font-weight:600">세부내역 보기 ▸</span>' +
       '</div>' + rowsHtml + '</div>';
   }).join('');
 }
+
+// ── 중복시설 세부내역 모달 (선택 시 즉시 필드비교 + 연관VOC 표시) ──
+let DUP_DETAIL_VOCS = [];
+function openDupDetail(key, tab){
+  const src = tab === 'cno' ? (DUP_FAC.byCno||{}) : (DUP_FAC.bySvc||{});
+  const rows = src[key] || [];
+  if(!rows.length) return;
+  const label = tab === 'cno' ? '계약번호' : '서비스번호';
+
+  document.getElementById('dupDetailTitle').textContent = `${label} 중복 세부내역 — ${key}`;
+  document.getElementById('dupDetailSub').textContent = `${rows.length}개 시설 행이 동일 키로 존재 (값이 다른 필드는 데이터 정합성 점검 필요)`;
+
+  const fields = [
+    ['영업구역번호','bizZone'],['기술구역번호','techZone'],['계약상태(중)','csm'],['계약상태(대)','cst'],
+    ['서비스상태','ssm'],['연락처','mobile'],['영업자명','sl'],['영업자연락처','slt'],
+    ['담당자','mgr'],['구역담당지점','mb'],['구역담당영업사원','ms'],
+    ['정지시작일자','stop'],['정지희망종료일','stopE'],['해지일자','term'],
+    ['견적월정료','fee'],['설치주소','addr'],
+  ];
+  let tbl = '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;padding:6px 8px;background:var(--bg2);position:sticky;top:0">필드</th>'+
+    rows.map((_,i)=>`<th style="text-align:left;padding:6px 8px;background:var(--bg2);position:sticky;top:0">행 #${i+1}</th>`).join('')+'</tr></thead><tbody>';
+  fields.forEach(([flabel,fkey])=>{
+    const vals = rows.map(r=>r[fkey]||'-');
+    const diff = new Set(vals).size > 1;
+    tbl += `<tr style="${diff?'background:#fef3c7':''}"><td style="padding:5px 8px;color:var(--t3);font-weight:600;white-space:nowrap">${esc(flabel)}${diff?' ⚠️':''}</td>`+
+      vals.map(v=>`<td style="padding:5px 8px">${esc(v)}</td>`).join('')+'</tr>';
+  });
+  tbl += '</tbody></table>';
+  document.getElementById('dupDetailTable').innerHTML = tbl;
+
+  const matchField = tab === 'cno' ? '계약번호' : '서비스번호';
+  DUP_DETAIL_VOCS = ALL.filter(r => nNum(r[matchField]||'') === key);
+  document.getElementById('dupDetailVocList').innerHTML = DUP_DETAIL_VOCS.length ? DUP_DETAIL_VOCS.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openDupRelatedVoc(${i})">
+      <span class="bdg ${SC[r['상태']]||'bgr'}" style="font-size:10px">${esc(r['상태']||'-')}</span>
+      <span style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r['상호']||r['고객명']||'미상')}</span>
+      <span style="font-size:10px;color:var(--t3)">${esc(r['관리지사']||'')} · ${esc(r['접수일시']||'')}</span>
+    </div>`).join('') : '<div class="no-data" style="padding:14px">연관 VOC 없음</div>';
+
+  document.getElementById('dupDetailOv').classList.add('on');
+}
+function openDupRelatedVoc(i){
+  const r = DUP_DETAIL_VOCS[i];
+  if(!r) return;
+  closeDupDetail();
+  openDbyR(r);
+}
+function closeDupDetail(){ document.getElementById('dupDetailOv').classList.remove('on'); }
 
 function exportDupCsv(){
   const src = DUP_TAB === 'cno' ? (DUP_FAC.byCno||{}) : (DUP_FAC.bySvc||{});
