@@ -4492,46 +4492,76 @@ function shareVocCardHtml(r){
   '</div>';
 }
 
-// ── 메일 호환(스크립트 제거되어도 동작) — <details>/<summary> 아코디언 방식 ──
-// 각 그룹을 접고 펼 수 있는 네이티브 HTML 요소로 구성. JS·onclick 전혀 사용 안 함.
-function shareGroupAccordionHtml(groupKey, rows, openFirst){
-  const cardsHtml = rows.map(shareVocCardHtml).join('');
-  const openAttr = openFirst ? ' open' : '';
-  return '' +
-  '<details' + openAttr + ' style="margin-bottom:8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;overflow:hidden">' +
-    '<summary style="padding:10px 14px;cursor:pointer;background:#f1f5f9;font-size:13px;font-weight:700;color:#0f172a;list-style:none;user-select:none">' +
-      '▸ ' + esc(groupKey) +
-      ' <span style="font-weight:400;color:#2563eb;font-size:12px;margin-left:6px">(' + rows.length + '건)</span>' +
-    '</summary>' +
-    '<div style="padding:12px 14px;background:#fafbfc">' + cardsHtml + '</div>' +
-  '</details>';
+// ── 메일 호환(스크립트 제거되어도 동작) — <details>/<summary> 3단 중첩 아코디언 ──
+// 지사 → 영업구역 → 담당자 → VOC카드. 전부 기본 접힘, JS·onclick 전혀 사용 안 함.
+const SHARE_BRANCH_ORDER = ['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
+
+// 미분류는 항상 맨 뒤로, 지사 레벨은 지정 순서, 그 외는 가나다순
+function shareSortKeys(keys, isBranchLevel){
+  return keys.slice().sort((a,b)=>{
+    if(a==='미분류'&&b==='미분류') return 0;
+    if(a==='미분류') return 1;
+    if(b==='미분류') return -1;
+    if(isBranchLevel){
+      const ia=SHARE_BRANCH_ORDER.indexOf(a), ib=SHARE_BRANCH_ORDER.indexOf(b);
+      if(ia===-1&&ib===-1) return a.localeCompare(b,'ko');
+      if(ia===-1) return 1;
+      if(ib===-1) return -1;
+      return ia-ib;
+    }
+    return a.localeCompare(b,'ko');
+  });
+}
+function shareGroupBy(rows, keyFn){
+  const groups={};
+  rows.forEach(r=>{ const k=keyFn(r)||'미분류'; if(!groups[k])groups[k]=[]; groups[k].push(r); });
+  return groups;
 }
 
-// 하나의 분류 섹션(담당자별/영업구역별/관리지사별) 생성
-function shareBuildSection(d, keyFn, sectionTitle, sectionIcon, accentColor){
-  const groups = {};
-  d.forEach(r=>{
-    const k = keyFn(r) || '미분류';
-    if(!groups[k]) groups[k] = [];
-    groups[k].push(r);
-  });
-  const keys = Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
-
-  const header = '' +
-    '<div style="font-size:15px;font-weight:800;color:#fff;background:' + accentColor + ';padding:9px 14px;border-radius:6px;margin:18px 0 10px 0">' +
-      sectionIcon + ' ' + sectionTitle +
-      ' <span style="font-weight:400;font-size:11px;opacity:.85;margin-left:6px">' + keys.length + '개 분류 · 총 ' + d.length + '건</span>' +
-    '</div>';
-
-  if(!keys.length){
-    return header + '<div style="padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;color:#94a3b8;font-size:12px">데이터 없음</div>';
-  }
-  // 요약 줄 (KT 메일 화면처럼 '미분류 (12)정수현 (6)' 같은 인덱스)
-  const summary = '<div style="font-size:11px;color:#475569;margin-bottom:8px;padding:6px 10px;background:#f8fafc;border-radius:6px;line-height:1.7">' +
-    keys.map(k=>'<b>'+esc(k)+'</b> ('+groups[k].length+')').join(' &nbsp; ') + '</div>';
-
-  const body = keys.map((k,i)=>shareGroupAccordionHtml(k, groups[k], i===0)).join('');
-  return header + summary + body;
+// 3단계: 담당자별 — VOC 카드 목록
+function shareLevelMgr(rows){
+  const groups=shareGroupBy(rows, r=>r._zoneName||r._mgr||r._ms||'');
+  const keys=shareSortKeys(Object.keys(groups), false);
+  return keys.map(k=>{
+    const grows=groups[k];
+    return '<details style="margin:6px 0;border:1px solid #dbeafe;border-radius:6px;background:#fff;overflow:hidden">' +
+      '<summary style="padding:8px 12px;cursor:pointer;background:#eff6ff;font-size:12.5px;font-weight:700;color:#1e3a8a;list-style:none;user-select:none;display:flex;justify-content:space-between;align-items:center">' +
+        '<span>👤 ' + esc(k) + '</span>' +
+        '<span style="font-weight:400;color:#2563eb;font-size:11px;white-space:nowrap;margin-left:10px">' + grows.length + '건</span>' +
+      '</summary>' +
+      '<div style="padding:10px 12px;background:#fafbfc">' + grows.map(shareVocCardHtml).join('') + '</div>' +
+    '</details>';
+  }).join('');
+}
+// 2단계: 영업구역별 — 담당자 아코디언 포함
+function shareLevelZone(rows){
+  const groups=shareGroupBy(rows, r=>r._bizZone||'');
+  const keys=shareSortKeys(Object.keys(groups), false);
+  return keys.map(k=>{
+    const grows=groups[k];
+    return '<details style="margin:8px 0;border:1px solid #a5f3fc;border-radius:7px;background:#fcfeff;overflow:hidden">' +
+      '<summary style="padding:9px 13px;cursor:pointer;background:#ecfeff;font-size:13px;font-weight:700;color:#0e7490;list-style:none;user-select:none;display:flex;justify-content:space-between;align-items:center">' +
+        '<span>📍 ' + esc(k) + '</span>' +
+        '<span style="font-weight:400;color:#0891b2;font-size:11px;white-space:nowrap;margin-left:10px">' + grows.length + '건</span>' +
+      '</summary>' +
+      '<div style="padding:8px 10px 10px 18px">' + shareLevelMgr(grows) + '</div>' +
+    '</details>';
+  }).join('');
+}
+// 1단계(최상위): 관리지사별 — 영업구역 아코디언 포함
+function shareLevelBranch(d){
+  const groups=shareGroupBy(d, r=>r['관리지사']||'');
+  const keys=shareSortKeys(Object.keys(groups), true);
+  return keys.map(k=>{
+    const grows=groups[k];
+    return '<details style="margin-bottom:10px;border:1px solid #94a3b8;border-radius:8px;background:#fff;overflow:hidden">' +
+      '<summary style="padding:11px 15px;cursor:pointer;background:#1e293b;color:#fff;font-size:14px;font-weight:800;list-style:none;user-select:none;display:flex;justify-content:space-between;align-items:center">' +
+        '<span>🏢 ' + esc(k) + '</span>' +
+        '<span style="font-weight:400;font-size:12px;opacity:.85;white-space:nowrap;margin-left:10px">' + grows.length + '건</span>' +
+      '</summary>' +
+      '<div style="padding:10px 12px;background:#f8fafc">' + shareLevelZone(grows) + '</div>' +
+    '</details>';
+  }).join('');
 }
 
 // 전체 공유 HTML 문서 생성 — JS 의존성 0%, 메일 클라이언트 호환
@@ -4539,24 +4569,21 @@ function buildShareHtmlDoc(){
   const d = filtered.length ? filtered : ALL;
   const title = (document.getElementById('shareExportTitle').value || '').trim() || 'VOC 현황 조회';
   const today = new Date().toLocaleDateString('ko-KR');
+  const branchCnt = new Set(d.map(r=>r['관리지사']||'미분류')).size;
 
-  const secMgr    = shareBuildSection(d, r=>r._zoneName || r._mgr || r._ms || '', '담당자별', '👤', '#2563eb');
-  const secZone   = shareBuildSection(d, r=>r._bizZone || '',                        '영업구역별', '📍', '#0891b2');
-  const secBranch = shareBuildSection(d, r=>r['관리지사'] || '',                      '관리지사별', '🏢', '#7c3aed');
+  const body = shareLevelBranch(d);
 
   // ← 왼쪽 정렬: margin:0 (가운데 정렬 제거), max-width는 가독성 위해 유지하되 좌측 고정
   const html = '' +
 '<div style="max-width:880px;margin:0;font-family:\'Malgun Gothic\',sans-serif;background:#f8fafc;padding:18px;border-radius:10px">' +
   '<div style="background:linear-gradient(135deg,#0c1f4a,#1a56db);border-radius:8px;padding:18px 22px;margin-bottom:16px">' +
     '<div style="color:#fff;font-size:19px;font-weight:800">' + esc(title) + '</div>' +
-    '<div style="color:#bfdbfe;font-size:12px;margin-top:4px">강북/강원사업지원팀 · KT Security &nbsp;|&nbsp; 작성일 ' + today + ' &nbsp;|&nbsp; 대상 ' + d.length + '건</div>' +
+    '<div style="color:#bfdbfe;font-size:12px;margin-top:4px">강북/강원사업지원팀 · KT Security &nbsp;|&nbsp; 작성일 ' + today + ' &nbsp;|&nbsp; 대상 ' + d.length + '건 · 지사 ' + branchCnt + '개</div>' +
   '</div>' +
   '<div style="font-size:11px;color:#64748b;margin-bottom:10px;padding:8px 12px;background:#fff;border-left:3px solid #2563eb;border-radius:4px">' +
-    '💡 각 분류 항목(▸)을 <b>클릭</b>하면 펼쳐지고, 다시 클릭하면 접힙니다.' +
+    '💡 지사 → 영업구역 → 담당자 순으로 펼쳐집니다 (기본 모두 접힘). 🏢지사 클릭 → 📍구역 클릭 → 👤담당자 클릭 시 해당 VOC 카드가 표시됩니다.' +
   '</div>' +
-  secMgr +
-  secZone +
-  secBranch +
+  body +
   '<div style="margin-top:18px;text-align:left;font-size:10px;color:#94a3b8">VOC 정보조회 시스템에서 자동 생성됨 · ' + today + '</div>' +
 '</div>';
 
