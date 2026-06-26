@@ -2092,7 +2092,9 @@ function bsSortBranches(arr){
   });
 }
 function bsNorm(v){return (v||'').trim()||'(미지정)';}
-function bsState(r){const s=r['상태'];return ['미접수','접수','처리완료'].includes(s)?s:'기타';}
+const BS_STATES=['미접수','접수','처리중','처리완료','결재요청'];
+const BS_STATE_COLORS={'미접수':'#dc2626','접수':'#d97706','처리중':'#7c3aed','처리완료':'#16a34a','결재요청':'#0891b2','미분류':'#64748b'};
+function bsState(r){const s=r['상태'];return BS_STATES.includes(s)?s:'미분류';}
 function bsMgrOf(r){return r._zoneName||r._mgr||'';}
 function bsPalette(n){const out=[];for(let i=0;i<n;i++)out.push(CLR[i%CLR.length]);return out;}
 
@@ -2164,19 +2166,21 @@ function bsFilterTagText(){
 function renderBranchSummary(){
   const d=bsFiltered(),total=d.length;
   document.getElementById('bsFilterTag').textContent=bsFilterTagText();
-  const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+  const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
   d.forEach(r=>cnt[bsState(r)]++);
   document.getElementById('bsKpi').innerHTML=`
     <div class="kpi"><div class="kl">전체</div><div class="kv">${total}</div></div>
     <div class="kpi b4"><div class="kl">미접수</div><div class="kv" style="color:var(--red)">${cnt['미접수']}</div></div>
     <div class="kpi b2"><div class="kl">접수</div><div class="kv" style="color:var(--org)">${cnt['접수']}</div></div>
+    <div class="kpi b5"><div class="kl">처리중</div><div class="kv" style="color:var(--pur)">${cnt['처리중']}</div></div>
     <div class="kpi b3"><div class="kl">처리완료</div><div class="kv" style="color:var(--grn)">${cnt['처리완료']}</div></div>
-    <div class="kpi b7"><div class="kl">기타</div><div class="kv" style="color:#64748b">${cnt['기타']}</div></div>
+    <div class="kpi b6"><div class="kl">결재요청</div><div class="kv" style="color:var(--tel)">${cnt['결재요청']}</div></div>
+    ${cnt['미분류']?`<div class="kpi b7"><div class="kl">미분류</div><div class="kv" style="color:#64748b">${cnt['미분류']}</div></div>`:''}
   `;
 
   const branches=bsSortBranches([...new Set(d.map(r=>bsNorm(r['관리지사'])))]);
-  const states=['미접수','접수','처리완료','기타'];
-  const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
+  const states=BS_STATES;
+  const stColors=BS_STATE_COLORS;
 
   if(charts.bsStatus)charts.bsStatus.destroy();
   charts.bsStatus=new Chart(document.getElementById('bsChartStatus'),{
@@ -2282,8 +2286,21 @@ function renderMgrSection(){
 
   const zn=document.getElementById('bs_zone').value;
   const pool=ALL.filter(r=>bsNorm(r['관리지사'])===br && (!zn||bsNorm(r._bizZone)===zn));
-  const states=['미접수','접수','처리완료','기타'];
-  const stColors={'미접수':'#dc2626','접수':'#d97706','처리완료':'#16a34a','기타':'#64748b'};
+  const states=BS_STATES;
+  const stColors=BS_STATE_COLORS;
+
+  const bsStatTh = `
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--red)">미접수</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--org)">접수</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--pur)">처리중</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--grn)">처리완료</th>
+        <th style="padding:6px 8px;background:var(--bg2);color:var(--tel)">결재요청</th>`;
+  const bsStatTd = s => `
+          <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:${s['미접수']>0?700:400}">${s['미접수']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--org)">${s['접수']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--pur)">${s['처리중']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--grn)">${s['처리완료']}</td>
+          <td style="padding:6px 8px;text-align:center;color:var(--tel)">${s['결재요청']}</td>`;
 
   // ── 처리자별 현황 (실제 VOC를 처리한 사람 — 로스터 없이 실데이터 기준) ──
   const handlerNames=[...new Set(pool.map(r=>bsNorm(r['처리자'])))].sort((a,b)=>{
@@ -2292,7 +2309,7 @@ function renderMgrSection(){
   });
   const handlerStats=handlerNames.map(h=>{
     const rows=pool.filter(r=>bsNorm(r['처리자'])===h);
-    const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+    const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
     rows.forEach(r=>cnt[bsState(r)]++);
     return {h,rows,total:rows.length,...cnt};
   });
@@ -2300,20 +2317,12 @@ function renderMgrSection(){
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr>
         <th style="text-align:left;padding:6px 8px;background:var(--bg2)">처리자</th>
-        <th style="padding:6px 8px;background:var(--bg2)">전체</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--red)">미접수</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--org)">접수</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--grn)">처리완료</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:#64748b">기타</th>
+        <th style="padding:6px 8px;background:var(--bg2)">전체</th>${bsStatTh}
       </tr></thead>
       <tbody>${handlerStats.map(s=>`
         <tr style="cursor:pointer;border-bottom:1px solid var(--bd)" onclick="openHandlerDetail('${s.h.replace(/'/g,"\\'")}','${br.replace(/'/g,"\\'")}')">
           <td style="padding:6px 8px;font-weight:600">${esc(s.h)}</td>
-          <td style="padding:6px 8px;text-align:center">${s.total}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:${s['미접수']>0?700:400}">${s['미접수']}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--org)">${s['접수']}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--grn)">${s['처리완료']}</td>
-          <td style="padding:6px 8px;text-align:center;color:#64748b">${s['기타']}</td>
+          <td style="padding:6px 8px;text-align:center">${s.total}</td>${bsStatTd(s)}
         </tr>`).join('')}</tbody>
     </table>`;
 
@@ -2328,30 +2337,22 @@ function renderMgrSection(){
 
   const mgrStats=mgrs.map(m=>{
     const rows=pool.filter(r=>bsMgrLabel(r,br)===m);
-    const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+    const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
     rows.forEach(r=>cnt[bsState(r)]++);
     return {m,rows,total:rows.length,...cnt};
   });
 
-  // ── 상단 요약 테이블 (미접수/접수/처리완료/기타 한눈에) ──
+  // ── 상단 요약 테이블 (미접수/접수/처리중/처리완료/결재요청 한눈에) ──
   document.getElementById('bsMgrSummaryTable').innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr>
         <th style="text-align:left;padding:6px 8px;background:var(--bg2)">담당자</th>
-        <th style="padding:6px 8px;background:var(--bg2)">전체</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--red)">미접수</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--org)">접수</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:var(--grn)">처리완료</th>
-        <th style="padding:6px 8px;background:var(--bg2);color:#64748b">기타</th>
+        <th style="padding:6px 8px;background:var(--bg2)">전체</th>${bsStatTh}
       </tr></thead>
       <tbody>${mgrStats.map(s=>`
         <tr style="cursor:pointer;border-bottom:1px solid var(--bd)" onclick="openMgrDetail('${s.m.replace(/'/g,"\\'")}','${br.replace(/'/g,"\\'")}')">
           <td style="padding:6px 8px;font-weight:600">${esc(s.m)}${s.total===0?' <span style="color:var(--t3);font-weight:400;font-size:10px">(VOC없음)</span>':''}</td>
-          <td style="padding:6px 8px;text-align:center">${s.total}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--red);font-weight:${s['미접수']>0?700:400}">${s['미접수']}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--org)">${s['접수']}</td>
-          <td style="padding:6px 8px;text-align:center;color:var(--grn)">${s['처리완료']}</td>
-          <td style="padding:6px 8px;text-align:center;color:#64748b">${s['기타']}</td>
+          <td style="padding:6px 8px;text-align:center">${s.total}</td>${bsStatTd(s)}
         </tr>`).join('')}</tbody>
     </table>`;
 
@@ -2411,7 +2412,7 @@ function openMgrDetail(mgrName, br){
   const total = rows.length;
   const sample = rows[0]||{};
 
-  const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+  const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
   rows.forEach(r=>cnt[bsState(r)]++);
   const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
 
@@ -2424,8 +2425,10 @@ function openMgrDetail(mgrName, br){
     <div class="kpi"><div class="kl">총건수</div><div class="kv">${total}</div></div>
     <div class="kpi b4"><div class="kl">미접수</div><div class="kv" style="color:var(--red)">${cnt['미접수']}</div></div>
     <div class="kpi b2"><div class="kl">접수</div><div class="kv" style="color:var(--org)">${cnt['접수']}</div></div>
+    <div class="kpi b5"><div class="kl">처리중</div><div class="kv" style="color:var(--pur)">${cnt['처리중']}</div></div>
     <div class="kpi b3"><div class="kl">처리완료</div><div class="kv" style="color:var(--grn)">${cnt['처리완료']}</div></div>
-    <div class="kpi b5"><div class="kl">평균리스크</div><div class="kv" style="color:var(--pur)">${avgRisk}</div></div>
+    <div class="kpi b6"><div class="kl">결재요청</div><div class="kv" style="color:var(--tel)">${cnt['결재요청']}</div></div>
+    <div class="kpi b8"><div class="kl">평균리스크</div><div class="kv" style="color:#f59e0b">${avgRisk}</div></div>
   `;
 
   const byType={};
@@ -2482,7 +2485,7 @@ function openHandlerDetail(handlerName, br){
   const total = rows.length;
   const sample = rows[0]||{};
 
-  const cnt={'미접수':0,'접수':0,'처리완료':0,'기타':0};
+  const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
   rows.forEach(r=>cnt[bsState(r)]++);
   const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
 
@@ -2495,8 +2498,10 @@ function openHandlerDetail(handlerName, br){
     <div class="kpi"><div class="kl">총건수</div><div class="kv">${total}</div></div>
     <div class="kpi b4"><div class="kl">미접수</div><div class="kv" style="color:var(--red)">${cnt['미접수']}</div></div>
     <div class="kpi b2"><div class="kl">접수</div><div class="kv" style="color:var(--org)">${cnt['접수']}</div></div>
+    <div class="kpi b5"><div class="kl">처리중</div><div class="kv" style="color:var(--pur)">${cnt['처리중']}</div></div>
     <div class="kpi b3"><div class="kl">처리완료</div><div class="kv" style="color:var(--grn)">${cnt['처리완료']}</div></div>
-    <div class="kpi b5"><div class="kl">평균리스크</div><div class="kv" style="color:var(--pur)">${avgRisk}</div></div>
+    <div class="kpi b6"><div class="kl">결재요청</div><div class="kv" style="color:var(--tel)">${cnt['결재요청']}</div></div>
+    <div class="kpi b8"><div class="kl">평균리스크</div><div class="kv" style="color:#f59e0b">${avgRisk}</div></div>
   `;
 
   const byType={};
