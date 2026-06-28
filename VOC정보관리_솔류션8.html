@@ -947,6 +947,25 @@ const DC={'SP':'bb','SE':'bt','SG':'bg','본사':'bp2','지사':'bo','협력사'
 const VC={'업무협조':'bb','AS':'bt','변경/조회':'bgr','청구 미/수납':'br','해지':'bo','설치/철거':'by','출동':'bp2'};
 const CC={'유지':'bg','명변유지':'bt','일시정지':'bst','청구설변':'bo','일반해지':'bte','명변해지':'bte','전출해지':'bte','청약등록':'bb','청약반려':'bgr'};
 const CLR=['#1a56db','#e07b20','#dc2626','#16a34a','#7c3aed','#0891b2','#9ca3af','#f59e0b'];
+// 지사 표시 순서 — 파일 전체에서 단일 진실 공급원(SSOT). 다른 곳에서 별도 배열을
+// 또 만들지 말고 이 상수(또는 sortByBranchOrder)를 재사용할 것.
+const BRANCH_ORDER=['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
+function sortByBranchOrder(arr,getBranch){
+  getBranch = getBranch || (x=>x);
+  return arr.slice().sort((a,b)=>{
+    const ba=getBranch(a), bb=getBranch(b);
+    const ia=BRANCH_ORDER.indexOf(ba), ib=BRANCH_ORDER.indexOf(bb);
+    if(ia===-1&&ib===-1) return String(ba).localeCompare(String(bb),'ko');
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia-ib;
+  });
+}
+// calcR()은 같은 행에 대해 여러 차트/리포트에서 반복 호출되므로 결과를 행에 캐시
+function calcRMemo(r){
+  if(r.__risk===undefined) r.__risk=calcR(r);
+  return r.__risk;
+}
 
 // ══ INIT ══
 // ══════════════════════════════════════════════
@@ -1533,6 +1552,8 @@ function buildRec(row,fi){
 
 function mergeMatch(){
   let cnt={svc:0,cno:0,cust:0,none:0};
+  // 재매칭으로 _csm 등 계산 입력값이 바뀌면 calcRMemo 캐시가 stale될 수 있어 매번 초기화
+  ALL.forEach(r=>{ delete r.__risk; });
   ALL=ALL.map(r=>{
     const vs=nNum(r['서비스번호']||'');
     const vc=nNum(r['계약번호']||'');
@@ -2083,7 +2104,7 @@ function renderCharts(){
   charts.t=new Chart(document.getElementById('cType'),{type:'doughnut',data:{labels:tL,datasets:[{data:tD,backgroundColor:CLR,borderWidth:1,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false}}}});
   document.getElementById('tleg').innerHTML=tL.map((l,i)=>`<span style="display:flex;align-items:center;gap:3px;cursor:pointer" onclick="qvt('${l}')"><span style="width:8px;height:8px;border-radius:2px;background:${CLR[i]||'#ccc'}"></span><span style="color:var(--t2)">${l} ${tD[i]}</span></span>`).join('');
   // ① 지사별 현황 — EDA 기초 분포: 건수 내림차순 정렬 + 8개 전체가 보이도록 높이 확장(HTML에서 height:240px 지정)
-  const brAll=['강북지사','서대문지사','고양지사','의정부지사','남양주지사','중앙지사','강릉지사','원주지사'];
+  const brAll=BRANCH_ORDER;
   const brCounts=brAll.map(b=>({b,n:d.filter(r=>r['관리지사']===b).length})).sort((a,b)=>b.n-a.n);
   const brMax=Math.max(1,...brCounts.map(v=>v.n));
   if(charts.b)charts.b.destroy();
@@ -2110,16 +2131,7 @@ function renderCharts(){
 function qvt(v){showPg('list',document.querySelectorAll('.nv')[1]);document.getElementById('f_vt').value=v;af();}
 
 // ══ 지사별 요약 대시보드 (신규) ══
-const BS_BRANCH_ORDER=['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
-function bsSortBranches(arr){
-  return arr.slice().sort((a,b)=>{
-    const ia=BS_BRANCH_ORDER.indexOf(a),ib=BS_BRANCH_ORDER.indexOf(b);
-    if(ia===-1&&ib===-1) return a.localeCompare(b,'ko');
-    if(ia===-1) return 1;
-    if(ib===-1) return -1;
-    return ia-ib;
-  });
-}
+function bsSortBranches(arr){ return sortByBranchOrder(arr); }
 function bsNorm(v){return (v||'').trim()||'(미지정)';}
 const BS_STATES=['미접수','접수','처리중','처리완료','결재요청'];
 const BS_STATE_COLORS={'미접수':'#dc2626','접수':'#d97706','처리중':'#7c3aed','처리완료':'#16a34a','결재요청':'#0891b2','미분류':'#64748b'};
@@ -2414,7 +2426,7 @@ function renderMgrSection(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:9}}}}}
   });
 
-  const riskAvg=mgrStats.map(s=>({m:s.m,avg:s.total?s.rows.reduce((sum,r)=>sum+calcR(r),0)/s.total:0})).sort((a,b)=>b.avg-a.avg);
+  const riskAvg=mgrStats.map(s=>({m:s.m,avg:s.total?s.rows.reduce((sum,r)=>sum+calcRMemo(r),0)/s.total:0})).sort((a,b)=>b.avg-a.avg);
   if(charts.mgrRisk)charts.mgrRisk.destroy();
   charts.mgrRisk=new Chart(document.getElementById('mgrChartRisk'),{
     type:'bar',
@@ -2443,7 +2455,7 @@ function openMgrDetail(mgrName, br){
 
   const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
   rows.forEach(r=>cnt[bsState(r)]++);
-  const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
+  const avgRisk = total ? (rows.reduce((s,r)=>s+calcRMemo(r),0)/total).toFixed(1) : '0';
 
   document.getElementById('mgrDetailTitle').textContent = `👤 ${mgrName} 담당자 심층 분석`;
   document.getElementById('mgrDetailSub').textContent = total
@@ -2479,7 +2491,7 @@ function openMgrDetail(mgrName, br){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{ticks:{font:{size:9}}}}}
   });
 
-  const riskTop=rows.map(r=>({r,score:calcR(r)})).sort((a,b)=>b.score-a.score).slice(0,5);
+  const riskTop=rows.map(r=>({r,score:calcRMemo(r)})).sort((a,b)=>b.score-a.score).slice(0,5);
   document.getElementById('mgrDetailRiskList').innerHTML = riskTop.length ? riskTop.map(({r,score})=>`
     <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openMgrRelatedVoc(${rows.indexOf(r)})">
       <span class="bdg ${score>=20?'br':score>=10?'bo':'bgr'}">${score}점</span>
@@ -2516,7 +2528,7 @@ function openHandlerDetail(handlerName, br){
 
   const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
   rows.forEach(r=>cnt[bsState(r)]++);
-  const avgRisk = total ? (rows.reduce((s,r)=>s+calcR(r),0)/total).toFixed(1) : '0';
+  const avgRisk = total ? (rows.reduce((s,r)=>s+calcRMemo(r),0)/total).toFixed(1) : '0';
 
   document.getElementById('mgrDetailTitle').textContent = `🗂 ${handlerName} 처리자 심층 분석`;
   document.getElementById('mgrDetailSub').textContent = total
@@ -2552,7 +2564,7 @@ function openHandlerDetail(handlerName, br){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}},x:{ticks:{font:{size:9}}}}}
   });
 
-  const riskTop=rows.map(r=>({r,score:calcR(r)})).sort((a,b)=>b.score-a.score).slice(0,5);
+  const riskTop=rows.map(r=>({r,score:calcRMemo(r)})).sort((a,b)=>b.score-a.score).slice(0,5);
   document.getElementById('mgrDetailRiskList').innerHTML = riskTop.length ? riskTop.map(({r,score})=>`
     <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openMgrRelatedVoc(${rows.indexOf(r)})">
       <span class="bdg ${score>=20?'br':score>=10?'bo':'bgr'}">${score}점</span>
@@ -3204,7 +3216,7 @@ function importMemosJson(file){
 // ══════════════════════════════════════════════
 // ★ GEO 분석 — 지사×구역 히트맵 + 기간비교(MOM)
 // ══════════════════════════════════════════════
-const BRANCHES8 = ['강북지사','서대문지사','고양지사','의정부지사','남양주지사','중앙지사','강릉지사','원주지사'];
+const BRANCHES8 = BRANCH_ORDER;  // SSOT: 전역 BRANCH_ORDER 재사용 (지사 순서 통일)
 let COMPARE_DATA = null;  // 업로드된 이전 기간 VOC
 
 function renderGeo(){
@@ -4540,16 +4552,14 @@ function shareVocCardHtml(r){
 
 // ── 메일 호환(스크립트 제거되어도 동작) — <details>/<summary> 3단 중첩 아코디언 ──
 // 지사 → 영업구역 → 담당자 → VOC카드. 전부 기본 접힘, JS·onclick 전혀 사용 안 함.
-const SHARE_BRANCH_ORDER = ['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
-
-// 미분류는 항상 맨 뒤로, 지사 레벨은 지정 순서, 그 외는 가나다순
+// 미분류는 항상 맨 뒤로, 지사 레벨은 전역 BRANCH_ORDER 순서, 그 외는 가나다순
 function shareSortKeys(keys, isBranchLevel){
   return keys.slice().sort((a,b)=>{
     if(a==='미분류'&&b==='미분류') return 0;
     if(a==='미분류') return 1;
     if(b==='미분류') return -1;
     if(isBranchLevel){
-      const ia=SHARE_BRANCH_ORDER.indexOf(a), ib=SHARE_BRANCH_ORDER.indexOf(b);
+      const ia=BRANCH_ORDER.indexOf(a), ib=BRANCH_ORDER.indexOf(b);
       if(ia===-1&&ib===-1) return a.localeCompare(b,'ko');
       if(ia===-1) return 1;
       if(ib===-1) return -1;
