@@ -301,6 +301,27 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
 .repeat-summary-box .rs-i{background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center}
 .repeat-summary-box .rs-i b{display:block;font-size:18px;color:var(--org)}
 .repeat-summary-box .rs-i span{font-size:10px;color:var(--t3)}
+
+/* ── 인쇄용 스타일 ── */
+.print-only{display:none}
+@media print{
+  body{background:#fff !important}
+  .hdr,.nav,.login-ov,.ov,.cfg-ov,.fp,.mbr,.pgb,
+  .ubtn,.btn,.mb,.memo-input-row,.bk-row,#tagw,
+  .wf-card .btn,.repeat-item .btn{display:none !important}
+  .print-only{display:block !important}
+  /* 기본 접힘 상태인 <details> 내용도 인쇄 시 강제로 펼쳐 보임 */
+  details:not([open]) summary ~ *{display:block !important}
+  summary{cursor:default}
+  .cc,.wf-card,.tc,.mbox,.action-box,.kpi,.repeat-item{
+    box-shadow:none !important;border:1px solid #cbd5e1 !important;page-break-inside:avoid
+  }
+  .pg{position:static !important}
+  .tw-s{overflow:visible !important}
+  .chrow,.dg,.wf-row,.krow{page-break-inside:avoid}
+  table{font-size:10px}
+  a{color:inherit;text-decoration:none}
+}
 </style>
 </head>
 <body>
@@ -576,11 +597,17 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
     <button class="ubtn" onclick="openCfg()">⚙ 시트설정</button>
     <button class="ubtn" onclick="exportCSV()">⬇ CSV</button>
     <button class="ubtn" onclick="openReport()">📊 보고서</button>
+    <button class="ubtn" onclick="printCurrentPage()">🖨 인쇄</button>
     <button class="ubtn" onclick="openDupCheck()">🔍 중복시설</button>
     <button class="ubtn" onclick="openShareExport()">📧 공유HTML</button>
     <button class="ubtn" onclick="openAdmin()">🔑 관리자</button>
     <button class="ubtn" onclick="logout()" title="로그아웃">🚪</button>
   </div>
+</div>
+
+<div class="print-only" id="printHeader" style="padding:12px 0;border-bottom:2px solid #1a2233;margin-bottom:10px">
+  <div style="font-size:18px;font-weight:800">VOC 정보조회 시스템 — 인쇄용 보고서</div>
+  <div style="font-size:11px;color:#5a6478;margin-top:2px" id="printMeta"></div>
 </div>
 
 <div class="nav">
@@ -804,6 +831,15 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
           <div class="wf-step"><div class="wf-dot wait" id="wdot5">✓</div><div class="wf-lbl">완료</div></div>
         </div>
         <div id="wfStats"></div>
+      </div>
+
+      <!-- 처리 소요시간(SLA) 분석 -->
+      <div class="wf-card">
+        <h3>⏱ 처리 소요시간(SLA) 분석 <span id="slaCnt" style="font-size:12px;color:var(--red);margin-left:6px;font-weight:400"></span></h3>
+        <div id="slaKpi" style="margin-bottom:12px"></div>
+        <div id="slaDist" style="margin-bottom:12px"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px">🔥 지연 건 TOP8 (경과일 많은 순)</div>
+        <div id="slaDelayList" style="max-height:240px;overflow-y:auto"></div>
       </div>
 
       <!-- 등록내용 워크플로우 패턴 분류 -->
@@ -2648,6 +2684,7 @@ const WFP_DEF={
   '리텐션·재약정':{pat:/재약정|약정.*종료|만기.*문의|할인.*방어/i,icon:'🎯',color:'var(--tel)',action:'리텐션팀 이첩 → 혜택 안내 → 재약정 유도'},
 };
 
+let URGENT_LIST_CACHE=[];
 function renderWF(){
   const d=filtered.length?filtered:ALL;
   
@@ -2683,10 +2720,11 @@ function renderWF(){
     </div>`).join('');
 
   // 긴급 대응 필요
-  const urgent=d.filter(r=>emSc(r)>=5).sort((a,b)=>emSc(b)-emSc(a));
+  const urgent=d.filter(r=>emSc(r)>=5).sort((a,b)=>emSc(b)-emSc(a)).slice(0,6);
+  URGENT_LIST_CACHE=urgent;  // onclick에서 r 직접 참조 불가 → 인덱스로 캐시 배열 참조 (기존 'r is not defined' 버그 수정)
   document.getElementById('urgentCnt').textContent=urgent.length+'건';
-  document.getElementById('urgentList').innerHTML=urgent.slice(0,6).map(r=>`
-    <div class="action-box urgent" onclick="openDbyR(r)" style="cursor:pointer">
+  document.getElementById('urgentList').innerHTML=urgent.map((r,i)=>`
+    <div class="action-box urgent" onclick="openDbyR(URGENT_LIST_CACHE[${i}])" style="cursor:pointer">
       <h5>😤 ${r['상호']||r['고객명']||'미상'} <span style="font-size:10px;color:var(--t3);margin-left:4px">${r['관리지사']||''} · ${r['접수일시']||''}</span></h5>
       <p>${(r['등록내용']||'').replace(/\n/g,' ').slice(0,120)}...</p>
       <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">
@@ -2738,6 +2776,76 @@ function renderWF(){
 
   // 반복 발생 분석 리포트
   renderRepeatReport(d);
+  renderSLA(d);
+}
+
+// ══ 처리 소요시간(SLA) 분석 ══
+// 접수일시/처리완료일시는 날짜 단위(YYYY-MM-DD) 정밀도이므로 '경과일' 기준으로 집계.
+// 완료건: 처리완료일시-접수일시 / 미완료건: 오늘-접수일시(dDiff 재사용)
+let SLA_DELAY_CACHE=[];
+const SLA_THRESHOLD=3; // 지연 판정 기준(일) — 통신/CS 업종 통상 SLA 권장치
+function renderSLA(d){
+  const items=d.filter(r=>r['접수일시']).map(r=>{
+    const recv=(r['접수일시']||'').slice(0,10);
+    const done=(r['처리완료일시']||'').slice(0,10);
+    let days, isDone;
+    if(done){ days=Math.floor((new Date(done)-new Date(recv))/86400000); isDone=true; }
+    else { days=dDiff(recv); isDone=false; }
+    return {r, days:Math.max(0,days||0), isDone};
+  });
+  const doneItems=items.filter(x=>x.isDone);
+  const pendingItems=items.filter(x=>!x.isDone);
+  const avgDone=doneItems.length?(doneItems.reduce((s,x)=>s+x.days,0)/doneItems.length).toFixed(1):'0';
+  const maxDays=items.length?Math.max(...items.map(x=>x.days)):0;
+  const delayed=pendingItems.filter(x=>x.days>=SLA_THRESHOLD).sort((a,b)=>b.days-a.days);
+  const slaRate=doneItems.length?Math.round(doneItems.filter(x=>x.days<SLA_THRESHOLD).length/doneItems.length*100):0;
+
+  document.getElementById('slaCnt').textContent=delayed.length?`지연 ${delayed.length}건`:'';
+
+  document.getElementById('slaKpi').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div style="background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--blue)">${avgDone}일</div>
+        <div style="font-size:11px;color:var(--t2)">평균 처리일(완료건)</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:${slaRate>=80?'var(--grn)':slaRate>=50?'var(--org)':'var(--red)'}">${slaRate}%</div>
+        <div style="font-size:11px;color:var(--t2)">SLA(${SLA_THRESHOLD}일내) 준수율</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--red)">${delayed.length}</div>
+        <div style="font-size:11px;color:var(--t2)">지연건(${SLA_THRESHOLD}일+ 미해결)</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:var(--t2)">${maxDays}일</div>
+        <div style="font-size:11px;color:var(--t2)">최장 경과일</div>
+      </div>
+    </div>`;
+
+  const buckets=[
+    {l:'0일',f:x=>x.days===0,c:'#16a34a'},
+    {l:'1일',f:x=>x.days===1,c:'#16a34a'},
+    {l:'2일',f:x=>x.days===2,c:'#1a56db'},
+    {l:'3~5일',f:x=>x.days>=3&&x.days<=5,c:'#d97706'},
+    {l:'6일+',f:x=>x.days>=6,c:'#dc2626'},
+  ];
+  const distData=buckets.map(b=>({l:b.l,c:b.c,n:items.filter(b.f).length}));
+  const maxD=Math.max(1,...distData.map(b=>b.n));
+  document.getElementById('slaDist').innerHTML=`
+    <div style="font-size:11px;color:var(--t3);margin-bottom:6px">경과일 구간별 분포 (미완료건은 현재까지 경과일 기준)</div>
+    ${distData.map(b=>`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="width:44px;font-size:11px;color:var(--t2)">${b.l}</span>
+        <div class="pb2" style="flex:1"><div class="pf2" style="width:${Math.round(b.n/maxD*100)}%;background:${b.c}"></div></div>
+        <span style="font-size:11px;color:var(--t3);min-width:24px;text-align:right">${b.n}</span>
+      </div>`).join('')}`;
+
+  SLA_DELAY_CACHE=delayed.slice(0,8).map(x=>x.r);
+  document.getElementById('slaDelayList').innerHTML=SLA_DELAY_CACHE.length?delayed.slice(0,8).map(({r,days},i)=>`
+    <div class="action-box urgent" onclick="openDbyR(SLA_DELAY_CACHE[${i}])" style="cursor:pointer">
+      <h5>⏱ ${r['상호']||r['고객명']||'미상'} <span style="font-size:10px;color:var(--red);margin-left:4px;font-weight:700">${days}일째 미해결</span></h5>
+      <p style="font-size:11px;color:var(--t2)">${r['관리지사']||''} · ${r['상태']||''} · 접수 ${r['접수일시']||'-'}</p>
+    </div>`).join(''):'<div class="no-data" style="padding:14px">⏱ 지연 건 없음 — 모두 SLA 이내</div>';
 }
 
 // ══ 반복 발생 분석 리포트 ══
@@ -3418,6 +3526,16 @@ function showPg(id,btn){
   if(id==='wflow')renderWF();
   if(id==='geo')renderGeo();
   if(id==='tech'){renderTech();af();}
+}
+
+// 인쇄 직전 현재 활성 페이지명·출력일시를 인쇄 헤더에 채운 뒤 인쇄 다이얼로그 호출
+function printCurrentPage(){
+  const pgLabel={'dash':'대시보드','list':'VOC 목록','wflow':'워크플로우 분석','geo':'지역분석','tech':'TOP10 기법'};
+  const activeNv=document.querySelector('.nv.on');
+  const id=Object.keys(pgLabel).find(k=>document.getElementById('pg-'+k)?.classList.contains('on'));
+  document.getElementById('printMeta').textContent =
+    `대상 화면: ${pgLabel[id]||'-'}  ·  출력일시: ${new Date().toLocaleString('ko-KR')}  ·  대상 ${(filtered.length||ALL.length).toLocaleString()}건`;
+  window.print();
 }
 
 // ══ HELPERS ══
