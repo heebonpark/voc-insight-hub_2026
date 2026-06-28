@@ -732,6 +732,13 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
       <div class="fg"><label>계약상태(중)</label>
         <select id="f_cs" onchange="onFilterChange(&apos;f_cs&apos;)"><option value="">전체</option><option>유지</option><option>명변유지</option><option>일시정지</option><option>청구설변</option><option>일반해지</option><option>명변해지</option><option>전출해지</option></select>
       </div>
+      <div class="fg"><label>접수기간</label>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="date" id="f_dateFrom" onchange="af()" style="border:1px solid var(--bd2);border-radius:var(--rs);padding:5px 6px;font-size:11px;background:var(--bg2);width:100%">
+          <span style="color:var(--t3);font-size:11px">~</span>
+          <input type="date" id="f_dateTo" onchange="af()" style="border:1px solid var(--bd2);border-radius:var(--rs);padding:5px 6px;font-size:11px;background:var(--bg2);width:100%">
+        </div>
+      </div>
     </div>
     <div class="frow2">
       <div class="sw"><span class="sw-i">🔍</span><input type="text" id="f_kw" placeholder="서비스번호 · 상호 · 고객번호 · 등록내용 · 연락처 검색..." oninput="af()"></div>
@@ -1599,6 +1606,7 @@ function condMatch(condVal, recVal){
 
 function af(){
   const st=effFilter('f_st'),dt=effFilter('f_dt'),vt=effFilter('f_vt'),br=effFilter('f_br'),png=effFilter('f_png'),cs=effFilter('f_cs'),kw=gv('f_kw').trim().toLowerCase();
+  const dFrom=gv('f_dateFrom'),dTo=gv('f_dateTo');
   filtered=ALL.filter(r=>{
     if(MF==='matched'&&!r._mt)return false;
     if(MF==='unmatched'&&r._mt)return false;
@@ -1615,11 +1623,13 @@ function af(){
     if(!condMatch(br, r['관리지사']))return false;
     if(!condMatch(png, (r['P/N/G']||'').trim()))return false;
     if(!condMatch(cs, r._csm))return false;
+    if(dFrom && (r['접수일시']||'')<dFrom) return false;
+    if(dTo && (r['접수일시']||'')>dTo) return false;
     if(kw){const h=[r['서비스번호'],r['상호'],r['고객명'],r['고객번호'],r['계약번호'],r['등록내용'],r['접수번호'],r._tel,r._mgr,r._bizZone].join(' ').toLowerCase();if(!h.includes(kw))return false;}
     return true;
   });
   sortD(); pg=1;
-  renderKPI(); rt(); renderTags(st,dt,vt,br,png,cs,kw);
+  renderKPI(); rt(); renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo);
   if(MF!=='all') document.getElementById('mlbl').textContent = mlblText(filtered.length);
 }
 
@@ -1637,7 +1647,7 @@ function mlblText(n){
   };
   return map[MF] || '';
 }
-function rf(){presetOverride={};['f_st','f_dt','f_vt','f_br','f_png','f_cs'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
+function rf(){presetOverride={};['f_st','f_dt','f_vt','f_br','f_png','f_cs','f_dateFrom','f_dateTo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
 
 // 사용자가 드롭다운을 직접 바꾸면 해당 필드의 다중값 오버라이드는 해제 (사용자 의도 우선)
 function onFilterChange(id){
@@ -1978,10 +1988,10 @@ function deletePreset(idx){
   renderPresetManageList();
 }
 
-function renderTags(st,dt,vt,br,png,cs,kw){
+function renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo){
   const lm={st:'상태',dt:'담당유형',vt:'VOC유형대',br:'관리지사',png:'P/N/G',cs:'계약상태',kw:'키워드'};
   const vm={st,dt,vt,br,png,cs,kw};
-  document.getElementById('tagw').innerHTML=Object.entries(vm).filter(([,v])=>{
+  let html=Object.entries(vm).filter(([,v])=>{
     if(Array.isArray(v)) return v.length>0;
     return !!v;
   }).map(([k,v])=>{
@@ -1991,8 +2001,13 @@ function renderTags(st,dt,vt,br,png,cs,kw){
     const extra = isArr && v.length>=2 ? 'background:#fef3c7;color:#92400e' : '';
     return `<span class="${cls}" style="${extra}" onclick="ct('${k}')"><span>✕</span>${lm[k]}: ${disp}</span>`;
   }).join('');
+  if(dFrom||dTo){
+    html += `<span class="atag" onclick="ct('date')"><span>✕</span>접수기간: ${dFrom||'시작'}~${dTo||'끝'}</span>`;
+  }
+  document.getElementById('tagw').innerHTML=html;
 }
 function ct(k){
+  if(k==='date'){ document.getElementById('f_dateFrom').value=''; document.getElementById('f_dateTo').value=''; af(); return; }
   const m={st:'f_st',dt:'f_dt',vt:'f_vt',br:'f_br',png:'f_png',cs:'f_cs',kw:'f_kw'};
   const id = m[k];
   document.getElementById(id).value='';
