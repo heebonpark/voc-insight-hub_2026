@@ -680,10 +680,10 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
     <summary>📊 전체 KPI · 분포 분석 상세 (펼치기/접기)</summary>
     <div class="krow" id="kbar"></div>
     <div class="ai-box" id="aibox" style="display:none"><div class="ai-hd">🤖 AI 자동 인사이트</div><ul id="ailist"></ul></div>
-    <div class="chrow">
-      <div class="cc"><h4>📊 VOC유형대 분포</h4><div class="cw"><canvas id="cType" role="img" aria-label="VOC유형대 분포">VOC유형대 분포</canvas></div><div id="tleg" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;font-size:10px"></div></div>
-      <div class="cc"><h4>🏢 지사별 현황</h4><div class="cw"><canvas id="cBr" role="img" aria-label="지사별">지사별</canvas></div></div>
-      <div class="cc"><h4>⚡ 워크플로우 패턴</h4><div class="cw"><canvas id="cWF" role="img" aria-label="워크플로우">워크플로우</canvas></div></div>
+    <div class="chrow" style="grid-template-columns:1.15fr 1fr 1fr">
+      <div class="cc"><h4>① 🏢 지사별 현황 <span style="font-weight:400;font-size:9px;color:var(--t3)">(기초 분포 · 건수多→少)</span></h4><div class="cw" style="height:240px"><canvas id="cBr" role="img" aria-label="지사별">지사별</canvas></div></div>
+      <div class="cc"><h4>② 📊 VOC유형대 분포 <span style="font-weight:400;font-size:9px;color:var(--t3)">(유형별 분포)</span></h4><div class="cw" style="height:240px"><canvas id="cType" role="img" aria-label="VOC유형대 분포">VOC유형대 분포</canvas></div><div id="tleg" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;font-size:10px"></div></div>
+      <div class="cc"><h4>③ ⚡ 워크플로우 패턴 <span style="font-weight:400;font-size:9px;color:var(--t3)">(텍스트 기반 파생 패턴)</span></h4><div class="cw" style="height:240px"><canvas id="cWF" role="img" aria-label="워크플로우">워크플로우</canvas></div></div>
     </div>
   </details>
 </div>
@@ -2082,10 +2082,24 @@ function renderCharts(){
   if(charts.t)charts.t.destroy();
   charts.t=new Chart(document.getElementById('cType'),{type:'doughnut',data:{labels:tL,datasets:[{data:tD,backgroundColor:CLR,borderWidth:1,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false}}}});
   document.getElementById('tleg').innerHTML=tL.map((l,i)=>`<span style="display:flex;align-items:center;gap:3px;cursor:pointer" onclick="qvt('${l}')"><span style="width:8px;height:8px;border-radius:2px;background:${CLR[i]||'#ccc'}"></span><span style="color:var(--t2)">${l} ${tD[i]}</span></span>`).join('');
-  // Branch
-  const brs=['강북지사','서대문지사','고양지사','의정부지사','남양주지사','중앙지사','강릉지사','원주지사'];
+  // ① 지사별 현황 — EDA 기초 분포: 건수 내림차순 정렬 + 8개 전체가 보이도록 높이 확장(HTML에서 height:240px 지정)
+  const brAll=['강북지사','서대문지사','고양지사','의정부지사','남양주지사','중앙지사','강릉지사','원주지사'];
+  const brCounts=brAll.map(b=>({b,n:d.filter(r=>r['관리지사']===b).length})).sort((a,b)=>b.n-a.n);
+  const brMax=Math.max(1,...brCounts.map(v=>v.n));
   if(charts.b)charts.b.destroy();
-  charts.b=new Chart(document.getElementById('cBr'),{type:'bar',data:{labels:brs.map(b=>b.replace('지사','')),datasets:[{data:brs.map(b=>d.filter(r=>r['관리지사']===b).length),backgroundColor:'#3b82f6',borderRadius:3,barThickness:12}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1,color:'#9ca3af'},grid:{color:'#f1f5f9'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{display:false}}}}});
+  charts.b=new Chart(document.getElementById('cBr'),{
+    type:'bar',
+    data:{labels:brCounts.map(v=>v.b.replace('지사','')),datasets:[{
+      data:brCounts.map(v=>v.n),
+      backgroundColor:brCounts.map(v=>`rgba(37,99,235,${0.35+0.55*(v.n/brMax)})`),
+      borderRadius:3, barThickness:14, categoryPercentage:0.85, barPercentage:0.9
+    }]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.raw}건`}}},
+      scales:{x:{beginAtZero:true,ticks:{stepSize:Math.max(1,Math.ceil(brMax/8)),color:'#9ca3af'},grid:{color:'#f1f5f9'}},
+              y:{ticks:{color:'#475569',font:{size:11,weight:'600'}},grid:{display:false}}}
+    }
+  });
   // Workflow patterns
   const WFP={영상불량:/영상불|영상.*재생.*안|전체.*영상불/,AS미방문:/미방문|연락.*없|방문.*없/,강성민원:/강성불만|강성|클레임/,청구환급:/이중납부|환급|과납/,명의변경:/명의변경/,이전설치:/이전.*설치|이사.*예정/,해지요청:/해지.*요청|폐업/,앱장애:/기가앱|토탈앱.*불|앱.*로그인/};
   const wfl={},wfL=Object.keys(WFP);
