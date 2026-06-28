@@ -3430,7 +3430,15 @@ function clsWF(text){
   return{label:'일반',icon:'📋'};
 }
 function findRepeat(d){const cnt={};d.forEach(r=>{const k=r['서비스번호'];if(k){if(!cnt[k])cnt[k]=[];cnt[k].push(r);}});return Object.entries(cnt).filter(([,v])=>v.length>1);}
-function extKW(text){const tokens=text.replace(/[\/\(\)\[\]]/g,' ').split(/\s+/).filter(t=>t.length>=2&&!/^\d+$/.test(t));const freq={};tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});return Object.entries(freq).sort((a,b)=>b[1]-a[1]);}
+// 등록내용 체크리스트 양식 고정 항목 — 키워드 분석 시 노이즈이므로 제외
+const KW_STOPWORDS=['핸드폰기종','휴대폰기종','어플명','인터넷이상유무','인터넷이용유무','메인아이디일치여부','통합앱고객명일치여부','신원확인여부'];
+function extKW(text){
+  const tokens=text.replace(/[\/\(\)\[\]]/g,' ').split(/\s+/)
+    .filter(t=>t.length>=2 && !/^\d+$/.test(t) && !KW_STOPWORDS.some(sw=>t.startsWith(sw)));
+  const freq={};
+  tokens.forEach(t=>{freq[t]=(freq[t]||0)+1;});
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+}
 
 // ══ VOC FILE LOAD ══
 function loadVOC(e){
