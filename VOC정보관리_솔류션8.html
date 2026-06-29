@@ -313,12 +313,15 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
   /* 기본 접힘 상태인 <details> 내용도 인쇄 시 강제로 펼쳐 보임 */
   details:not([open]) summary ~ *{display:block !important}
   summary{cursor:default}
+  /* 페이지 나눔 금지는 개별 카드 단위에만 적용 — .wf-row/.chrow 같은
+     여러 페이지 분량의 큰 그리드 컨테이너에 걸면 통째로 다음 페이지로
+     밀려 첫 페이지가 빈 공백으로 출력되는 버그가 생기므로 컨테이너에는 적용하지 않음 */
   .cc,.wf-card,.tc,.mbox,.action-box,.kpi,.repeat-item{
     box-shadow:none !important;border:1px solid #cbd5e1 !important;page-break-inside:avoid
   }
-  .pg{position:static !important}
-  .tw-s{overflow:visible !important}
-  .chrow,.dg,.wf-row,.krow{page-break-inside:avoid}
+  .pg,.wf-row,.chrow,.dg,.krow{position:static !important}
+  thead th{position:static !important}
+  .tw-s{overflow:visible !important;max-height:none !important}
   table{font-size:10px}
   a{color:inherit;text-decoration:none}
 }
@@ -664,8 +667,8 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
     <div class="cc"><h4>지사별 점유율</h4><div class="cw" style="height:210px"><canvas id="bsChartShare"></canvas></div></div>
   </div>
 
-  <!-- ▼ 전문가 분석 4종 (현재 필터 범위 연동) ▼ -->
-  <div class="bs-mgr-title">🧠 전문가 분석 (T1·T3·T5·T9 기법 — 현재 필터 범위 연동)</div>
+  <!-- ▼ 전문가 분석 5종 (현재 필터 범위 연동) ▼ -->
+  <div class="bs-mgr-title">🧠 전문가 분석 (T1·T3·T5·T7·T9 기법 — 현재 필터 범위 연동)</div>
   <div class="chrow" style="grid-template-columns:1.3fr 1fr">
     <div class="cc"><h4>[T5] 파레토 80/20 — VOC유형 핵심 원인군</h4><div class="cw" style="height:230px"><canvas id="bsChartPareto"></canvas></div></div>
     <div class="cc"><h4>[T1] 긴급도×영향도 매트릭스</h4><div id="bsT1" style="font-size:11px"></div></div>
@@ -674,7 +677,10 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
     <div class="cc"><h4>[T3] 등록내용 키워드 빈도 TOP8</h4><div class="cw" style="height:200px"><canvas id="bsChartKw"></canvas></div></div>
     <div class="cc"><h4>[T9] 반복접수 추적 (동일 서비스번호 2회+)</h4><div id="bsT9" style="font-size:11px;max-height:200px;overflow-y:auto"></div></div>
   </div>
-  <!-- ▲ 전문가 분석 4종 끝 ▲ -->
+  <div class="chrow" style="grid-template-columns:1fr">
+    <div class="cc"><h4>[T7] 요일별 접수 추이 + 이상감지 <span style="font-weight:400;font-size:9px;color:var(--t3)">(평균+1.5×표준편차 초과 요일 강조)</span></h4><div class="cw" style="height:200px"><canvas id="bsChartDow"></canvas></div></div>
+  </div>
+  <!-- ▲ 전문가 분석 5종 끝 ▲ -->
 
   <div id="bsMgrSection" style="display:none;margin-bottom:14px">
     <div class="bs-mgr-title">🗂 처리자·담당자별 상세 분석 — <span id="bsMgrBranchName"></span>
@@ -2344,6 +2350,33 @@ function renderExpertAnalysis(d){
       </div>
       <div style="color:var(--t3);font-size:10px">${esc(svc)} · ${esc(rows[0]['관리지사']||'')}</div>
     </div>`).join('') : '<div class="no-data" style="padding:14px">반복 접수 건 없음</div>';
+
+  // [T7] 요일별 접수 추이 + 이상감지 — 평균+1.5×표준편차 초과 요일을 적색으로 강조
+  const DOW=['일','월','화','수','목','금','토'];
+  const dowCnt=[0,0,0,0,0,0,0];
+  d.forEach(r=>{
+    const dt=(r['접수일시']||'').slice(0,10);
+    if(!dt) return;
+    const idx=new Date(dt).getDay();
+    if(!isNaN(idx)) dowCnt[idx]++;
+  });
+  const dowAvg=dowCnt.reduce((s,v)=>s+v,0)/7;
+  const dowStd=Math.sqrt(dowCnt.reduce((s,v)=>s+(v-dowAvg)**2,0)/7);
+  const dowThreshold=dowAvg+1.5*dowStd;
+  if(charts.bsDow)charts.bsDow.destroy();
+  charts.bsDow=new Chart(document.getElementById('bsChartDow'),{
+    type:'bar',
+    data:{labels:DOW.map(l=>l+'요일'),datasets:[{
+      label:'접수건수', data:dowCnt,
+      backgroundColor:dowCnt.map(v=>v>dowThreshold?'#dc2626':'#2563eb'),
+      borderRadius:3
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>ctx.raw>dowThreshold?`${ctx.raw}건 ⚠ 이상치(평균 ${dowAvg.toFixed(1)} 초과)`:`${ctx.raw}건`}}},
+      scales:{y:{beginAtZero:true,ticks:{stepSize:Math.max(1,Math.ceil(Math.max(...dowCnt)/8))}},x:{ticks:{font:{size:11}}}}
+    }
+  });
 }
 
 // 담당자 라벨: 매칭된 구역의 실제 소속지사가 화면에서 보는 지사와 다르면 (타지사:OO) 로 구분 표시
