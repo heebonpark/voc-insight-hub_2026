@@ -761,6 +761,9 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
       <div class="fg"><label>VOC유형대</label>
         <select id="f_vt" onchange="onFilterChange(&apos;f_vt&apos;)"><option value="">전체</option></select>
       </div>
+      <div class="fg"><label>VOC유형중</label>
+        <select id="f_typeMid" onchange="onFilterChange(&apos;f_typeMid&apos;)"><option value="">전체</option></select>
+      </div>
       <div class="fg"><label>관리지사</label>
         <select id="f_br" onchange="onFilterChange(&apos;f_br&apos;)"><option value="">전체</option><option>강북지사</option><option>서대문지사</option><option>고양지사</option><option>의정부지사</option><option>남양주지사</option><option>중앙지사</option><option>강릉지사</option><option>원주지사</option></select>
       </div>
@@ -1309,6 +1312,11 @@ function buildSels(){
   const hsel=document.getElementById('f_handler'),hcur=hsel.value;
   hsel.innerHTML='<option value="">전체</option>'+hd.map(v=>`<option>${v}</option>`).join('');
   hsel.value=hcur;
+
+  const tm=[...new Set(ALL.map(r=>r['VOC유형중']).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const tmsel=document.getElementById('f_typeMid'),tmcur=tmsel.value;
+  tmsel.innerHTML='<option value="">전체</option>'+tm.map(v=>`<option>${v}</option>`).join('');
+  tmsel.value=tmcur;
 }
 
 // ══ 영업담당자매칭 LOAD — 영업구역번호(구역번호) → 실제 구역담당자명 ══
@@ -1685,7 +1693,7 @@ function condMatch(condVal, recVal){
 }
 
 function af(){
-  const st=effFilter('f_st'),dt=effFilter('f_dt'),hd=effFilter('f_handler'),vt=effFilter('f_vt'),br=effFilter('f_br'),png=effFilter('f_png'),cs=effFilter('f_cs'),kw=gv('f_kw').trim().toLowerCase();
+  const st=effFilter('f_st'),dt=effFilter('f_dt'),hd=effFilter('f_handler'),vt=effFilter('f_vt'),tm=effFilter('f_typeMid'),br=effFilter('f_br'),png=effFilter('f_png'),cs=effFilter('f_cs'),kw=gv('f_kw').trim().toLowerCase();
   const dFrom=gv('f_dateFrom'),dTo=gv('f_dateTo');
   filtered=ALL.filter(r=>{
     if(MF==='matched'&&!r._mt)return false;
@@ -1701,17 +1709,17 @@ function af(){
     if(!condMatch(dt, r['담당유형']))return false;
     if(!condMatch(hd, r['처리자']))return false;
     if(!condMatch(vt, r['VOC유형대']))return false;
+    if(!condMatch(tm, r['VOC유형중']))return false;
     if(!condMatch(br, r['관리지사']))return false;
     if(!condMatch(png, (r['P/N/G']||'').trim()))return false;
     if(!condMatch(cs, r._csm))return false;
     if(dFrom && (r['접수일시']||'')<dFrom) return false;
     if(dTo && (r['접수일시']||'')>dTo) return false;
-    if(TEMP_TYPE_FILTER && r['VOC유형중']!==TEMP_TYPE_FILTER) return false;
     if(kw){const h=[r['서비스번호'],r['상호'],r['고객명'],r['고객번호'],r['계약번호'],r['등록내용'],r['접수번호'],r._tel,r._mgr,r._bizZone].join(' ').toLowerCase();if(!h.includes(kw))return false;}
     return true;
   });
   sortD(); pg=1;
-  renderKPI(); rt(); renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo,hd);
+  renderKPI(); rt(); renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo,hd,tm);
   if(MF!=='all') document.getElementById('mlbl').textContent = mlblText(filtered.length);
 }
 
@@ -1729,7 +1737,7 @@ function mlblText(n){
   };
   return map[MF] || '';
 }
-function rf(){presetOverride={};['f_st','f_dt','f_handler','f_vt','f_br','f_png','f_cs','f_dateFrom','f_dateTo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';TEMP_TYPE_FILTER='';document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
+function rf(){presetOverride={};['f_st','f_dt','f_handler','f_vt','f_typeMid','f_br','f_png','f_cs','f_dateFrom','f_dateTo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
 
 // 사용자가 드롭다운을 직접 바꾸면 해당 필드의 다중값 오버라이드는 해제 (사용자 의도 우선)
 function onFilterChange(id){
@@ -1741,8 +1749,8 @@ function onFilterChange(id){
 // ★ PRESET — 다중조건 저장/적용 (예: 담당유형=지사, 상태=미접수, 유형대=청구 미/수납)
 // ══════════════════════════════════════════════
 const PRESET_KEY = 'voc_v4_presets';
-const PRESET_FIELDS = ['f_st','f_dt','f_handler','f_vt','f_br','f_png','f_cs'];
-const PRESET_LABELS = {f_st:'상태',f_dt:'담당유형',f_handler:'처리자',f_vt:'VOC유형대',f_br:'관리지사',f_png:'P/N/G',f_cs:'계약상태(중)'};
+const PRESET_FIELDS = ['f_st','f_dt','f_handler','f_vt','f_typeMid','f_br','f_png','f_cs'];
+const PRESET_LABELS = {f_st:'상태',f_dt:'담당유형',f_handler:'처리자',f_vt:'VOC유형대',f_typeMid:'VOC유형중',f_br:'관리지사',f_png:'P/N/G',f_cs:'계약상태(중)'};
 
 function getPresets(){
   try{
@@ -2070,9 +2078,9 @@ function deletePreset(idx){
   renderPresetManageList();
 }
 
-function renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo,hd){
-  const lm={st:'상태',dt:'담당유형',hd:'처리자',vt:'VOC유형대',br:'관리지사',png:'P/N/G',cs:'계약상태',kw:'키워드'};
-  const vm={st,dt,hd,vt,br,png,cs,kw};
+function renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo,hd,tm){
+  const lm={st:'상태',dt:'담당유형',hd:'처리자',vt:'VOC유형대',tm:'VOC유형중',br:'관리지사',png:'P/N/G',cs:'계약상태',kw:'키워드'};
+  const vm={st,dt,hd,vt,tm,br,png,cs,kw};
   let html=Object.entries(vm).filter(([,v])=>{
     if(Array.isArray(v)) return v.length>0;
     return !!v;
@@ -2086,15 +2094,11 @@ function renderTags(st,dt,vt,br,png,cs,kw,dFrom,dTo,hd){
   if(dFrom||dTo){
     html += `<span class="atag" onclick="ct('date')"><span>✕</span>접수기간: ${dFrom||'시작'}~${dTo||'끝'}</span>`;
   }
-  if(TEMP_TYPE_FILTER){
-    html += `<span class="atag" style="background:#fef3c7;color:#92400e" onclick="ct('typeMid')"><span>✕</span>VOC유형중: ${esc(TEMP_TYPE_FILTER)}</span>`;
-  }
   document.getElementById('tagw').innerHTML=html;
 }
 function ct(k){
   if(k==='date'){ document.getElementById('f_dateFrom').value=''; document.getElementById('f_dateTo').value=''; af(); return; }
-  if(k==='typeMid'){ TEMP_TYPE_FILTER=''; af(); return; }
-  const m={st:'f_st',dt:'f_dt',hd:'f_handler',vt:'f_vt',br:'f_br',png:'f_png',cs:'f_cs',kw:'f_kw'};
+  const m={st:'f_st',dt:'f_dt',hd:'f_handler',vt:'f_vt',tm:'f_typeMid',br:'f_br',png:'f_png',cs:'f_cs',kw:'f_kw'};
   const id = m[k];
   document.getElementById(id).value='';
   if(presetOverride[id]) delete presetOverride[id];   // 다중값 오버라이드도 함께 해제
@@ -3438,7 +3442,6 @@ function renderGeo(){
 }
 
 // ── 지사×VOC유형중 매트릭스 ──────────────────────────
-let TEMP_TYPE_FILTER='';
 function renderTypeHeatmap(){
   const d = ALL;
   const matrix = {};
@@ -3500,9 +3503,9 @@ function renderTypeHeatmap(){
 }
 
 function geoFilterToType(branch, typeMid){
-  TEMP_TYPE_FILTER = typeMid || '';
   showPg('list', document.querySelectorAll('.nv')[1]);
   document.getElementById('f_br').value = branch;
+  document.getElementById('f_typeMid').value = typeMid || '';
   af();
 }
 
