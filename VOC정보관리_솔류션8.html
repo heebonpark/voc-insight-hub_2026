@@ -3427,22 +3427,24 @@ function renderTypeHeatmap(){
   const d = ALL;
   const matrix = {};
   BRANCHES8.forEach(b=>matrix[b]={});
+  const EXCLUDE_TYPES=['센터호전환','미분류'];
   d.forEach(r=>{
     const br = r['관리지사'];
     if(!BRANCHES8.includes(br)) return;
     const tp = r['VOC유형중'] || '미분류';
+    if(EXCLUDE_TYPES.includes(tp)) return;
     matrix[br][tp] = (matrix[br][tp]||0) + 1;
   });
 
   const typeTotals = {};
   Object.values(matrix).forEach(tm=>Object.entries(tm).forEach(([t,c])=>{ typeTotals[t]=(typeTotals[t]||0)+c; }));
-  const topTypes = Object.entries(typeTotals).sort((a,b)=>b[1]-a[1]).filter(([t])=>t!=='미분류').slice(0,8).map(([t])=>t);
-  const cols = [...topTypes, '기타', '미분류'];
+  const topTypes = Object.entries(typeTotals).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([t])=>t);
+  const cols = [...topTypes, '기타'];
 
   let maxVal = 0;
   const cellVal = (br,col) => {
     if(col==='기타'){
-      return Object.entries(matrix[br]).filter(([t])=>!topTypes.includes(t)&&t!=='미분류').reduce((s,[,c])=>s+c,0);
+      return Object.entries(matrix[br]).filter(([t])=>!topTypes.includes(t)).reduce((s,[,c])=>s+c,0);
     }
     return matrix[br][col] || 0;
   };
