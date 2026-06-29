@@ -549,7 +549,8 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
             <thead><tr>
               <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">상태</th>
               <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">상호/고객명</th>
-              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">VOC유형</th>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">VOC유형대</th>
+              <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">VOC유형중</th>
               <th style="text-align:left;padding:6px 8px;background:var(--bg2);font-size:11px">접수일시</th>
             </tr></thead>
             <tbody id="mgrDetailVocList"></tbody>
@@ -808,6 +809,7 @@ tbody td{padding:7px 9px;vertical-align:top;font-size:12px}
           <th onclick="srt('상호')" style="width:128px">상호</th>
           <th onclick="srt('관리지사')" style="width:66px">관리지사</th>
           <th onclick="srt('VOC유형대')" style="width:70px">유형대</th>
+          <th onclick="srt('VOC유형중')" style="width:70px">유형중</th>
           <th onclick="srt('VOC유형')" style="width:120px">VOC유형</th>
           <th style="width:178px">등록내용</th>
           <th onclick="srt('접수일시')" style="width:74px">접수일</th>
@@ -2636,8 +2638,9 @@ function openMgrDetail(mgrName, br){
       <td style="padding:5px 8px"><span class="bdg ${SC[r['상태']]||'bgr'}" style="font-size:10px">${r['상태']||'-'}</span></td>
       <td style="padding:5px 8px;font-size:11px">${esc(r['상호']||r['고객명']||'-')}</td>
       <td style="padding:5px 8px;font-size:11px">${esc(r['VOC유형대']||'-')}</td>
+      <td style="padding:5px 8px;font-size:11px">${esc(r['VOC유형중']||'-')}</td>
       <td style="padding:5px 8px;font-size:11px;color:var(--t3)">${esc(r['접수일시']||'-')}</td>
-    </tr>`).join('') : '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>';
 
   document.getElementById('mgrDetailOv').classList.add('on');
 }
@@ -2709,8 +2712,9 @@ function openHandlerDetail(handlerName, br){
       <td style="padding:5px 8px"><span class="bdg ${SC[r['상태']]||'bgr'}" style="font-size:10px">${r['상태']||'-'}</span></td>
       <td style="padding:5px 8px;font-size:11px">${esc(r['상호']||r['고객명']||'-')}</td>
       <td style="padding:5px 8px;font-size:11px">${esc(r['VOC유형대']||'-')}</td>
+      <td style="padding:5px 8px;font-size:11px">${esc(r['VOC유형중']||'-')}</td>
       <td style="padding:5px 8px;font-size:11px;color:var(--t3)">${esc(r['접수일시']||'-')}</td>
-    </tr>`).join('') : '<tr><td colspan="4" class="no-data">데이터 없음</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="5" class="no-data">데이터 없음</td></tr>';
 
   document.getElementById('mgrDetailOv').classList.add('on');
 }
@@ -2723,7 +2727,7 @@ function rt(){
   const kw=gv('f_kw').trim();
   const start=(pg-1)*pgSz,pD=filtered.slice(start,start+pgSz);
   const tb=document.getElementById('vbody');
-  if(!pD.length){tb.innerHTML=`<tr><td colspan="21" class="no-data">결과 없음</td></tr>`;renderPg();return;}
+  if(!pD.length){tb.innerHTML=`<tr><td colspan="22" class="no-data">결과 없음</td></tr>`;renderPg();return;}
   tb.innerHTML=pD.map((r,i)=>{
     const m=r._mt,isStop=r._csm==='일시정지',isTerm=['일반해지','명변해지','전출해지'].includes(r._csm);
     const tel=(r._tel||'').replace(/(\d{3})(\d{3,4})(\d{4})/,'$1-$2-$3');
@@ -2738,6 +2742,7 @@ function rt(){
       <td style="font-weight:600;max-width:128px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${hl(r['상호']||r['고객명'],kw)}${memoDotFor(r)}</td>
       <td style="font-size:11px;color:var(--t2)">${r['관리지사']||'—'}</td>
       <td><span class="bdg ${VC[r['VOC유형대']]||'bgr'}" style="font-size:10px">${r['VOC유형대']||'—'}</span></td>
+      <td style="font-size:11px;color:var(--t2)">${hl(r['VOC유형중'],kw)||'—'}</td>
       <td style="font-size:11px;color:var(--t2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${hl(r['VOC유형'],kw)}</td>
       <td><div class="cc2">${hl((r['등록내용']||'').slice(0,165),kw)}</div></td>
       <td style="white-space:nowrap;font-size:11px;color:var(--t2)">${r['접수일시']||'—'}</td>
