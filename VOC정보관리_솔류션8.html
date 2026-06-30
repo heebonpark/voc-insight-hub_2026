@@ -4913,42 +4913,194 @@ function shareLevelBranch(d){
   }).join('');
 }
 
-// 전체 공유 HTML 문서 생성 — JS 의존성 0%, 메일 클라이언트 호환
+// 공유용 자가조회 HTML 생성 — 반응형·대화식 필터 (지사/구역/담당자 캐스케이딩 + 상태 토글 + 매트릭스 + 차트)
 function buildShareHtmlDoc(){
-  const d = filtered.length ? filtered : ALL;
-  const title = (document.getElementById('shareExportTitle').value || '').trim() || 'VOC 현황 조회';
-  const today = new Date().toLocaleDateString('ko-KR');
-  const branchCnt = new Set(d.map(r=>r['관리지사']||'미분류')).size;
+  const ST_ONLY=['미접수','접수','처리완료'];
+  const d=(filtered.length?filtered:ALL).filter(r=>ST_ONLY.includes(r['상태']));
+  const title=((document.getElementById('shareExportTitle').value||'').trim())||'VOC 현황 조회';
+  const today=new Date().toLocaleDateString('ko-KR');
+  const brOrder=['중앙지사','강북지사','서대문지사','고양지사','의정부지사','남양주지사','강릉지사','원주지사'];
 
-  const body = shareLevelBranch(d);
+  const rows=d.map(r=>({
+    br:r['관리지사']||'미분류',
+    zone:r._bizZone||'',
+    handler:r._zoneName||r._mgr||r._ms||'미배정',
+    st:r['상태']||'',
+    co:r['상호']||r['고객명']||'미상',
+    dt:(r['접수일시']||'').slice(0,16),
+    vt:r['VOC유형대']||'',
+    vm:r['VOC유형중']||r['VOC유형']||'',
+    body:(r['등록내용']||'').slice(0,200),
+    svc:r['서비스번호']||''
+  }));
 
-  // ← 왼쪽 정렬: margin:0 (가운데 정렬 제거), max-width는 가독성 위해 유지하되 좌측 고정
-  const html = '' +
-'<div style="max-width:880px;margin:0;font-family:\'Malgun Gothic\',sans-serif;background:#f8fafc;padding:18px;border-radius:10px">' +
-  '<div style="background:linear-gradient(135deg,#0c1f4a,#1a56db);border-radius:8px;padding:18px 22px;margin-bottom:16px">' +
-    '<div style="color:#fff;font-size:19px;font-weight:800">' + esc(title) + '</div>' +
-    '<div style="color:#bfdbfe;font-size:12px;margin-top:4px">강북/강원사업지원팀 · KT Security &nbsp;|&nbsp; 작성일 ' + today + ' &nbsp;|&nbsp; 대상 ' + d.length + '건 · 지사 ' + branchCnt + '개</div>' +
-  '</div>' +
-  '<div style="font-size:11px;color:#64748b;margin-bottom:10px;padding:8px 12px;background:#fff;border-left:3px solid #2563eb;border-radius:4px">' +
-    '💡 지사 → 영업구역 → 담당자 순으로 펼쳐집니다 (기본 모두 접힘). 🏢지사 클릭 → 📍구역 클릭 → 👤담당자 클릭 시 해당 VOC 카드가 표시됩니다.' +
-  '</div>' +
-  body +
-  '<div style="margin-top:18px;text-align:left;font-size:10px;color:#94a3b8">VOC 정보조회 시스템에서 자동 생성됨 · ' + today + '</div>' +
-'</div>';
+  const safeData=JSON.stringify(rows).replace(/<\/scri/gi,'<\\/scri');
+  const safeBrOrder=JSON.stringify(brOrder);
+  const safeTitle=esc(title);
+
+  const css=
+    '*{box-sizing:border-box;margin:0;padding:0}'+
+    'body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#f1f5f9;color:#0f172a;font-size:14px}'+
+    '.hdr{background:linear-gradient(135deg,#0c1f4a,#1a56db);color:#fff;padding:14px 18px 12px;position:sticky;top:0;z-index:200;box-shadow:0 2px 6px rgba(0,0,0,.18)}'+
+    '.hdr h1{font-size:17px;font-weight:800;margin-bottom:2px}'+
+    '.hdr .sub{font-size:11px;color:#bfdbfe}'+
+    '.fb{background:#fff;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border-bottom:1px solid #e2e8f0;position:sticky;top:56px;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.05)}'+
+    '.fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px}'+
+    '.fg label{font-size:10px;color:#64748b;font-weight:700;letter-spacing:.3px}'+
+    '.fg select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#f9fafb;cursor:pointer}'+
+    '.stg{display:flex;gap:5px;flex-wrap:wrap;padding-top:18px}'+
+    '.sb{padding:5px 12px;border:2px solid #e2e8f0;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:#fff;transition:.12s;color:#64748b}'+
+    '.sb[data-st="미접수"].on{background:#fef3c7;border-color:#d97706;color:#92400e}'+
+    '.sb[data-st="접수"].on{background:#dbeafe;border-color:#2563eb;color:#1e3a8a}'+
+    '.sb[data-st="처리완료"].on{background:#dcfce7;border-color:#16a34a;color:#14532d}'+
+    '.wrap{padding:12px 14px;max-width:1200px;margin:0 auto}'+
+    '.sr{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}'+
+    '.sc{flex:1;min-width:90px;background:#fff;border-radius:8px;padding:10px 12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.07);border-top:3px solid #e2e8f0}'+
+    '.sc.t{border-top-color:#6366f1}.sc.m{border-top-color:#d97706}.sc.r{border-top-color:#2563eb}.sc.d{border-top-color:#16a34a}'+
+    '.sc .n{font-size:24px;font-weight:800;line-height:1.1}'+
+    '.sc .lb{font-size:10px;color:#64748b;margin-top:2px}'+
+    '.pp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}'+
+    '.pn{background:#fff;border-radius:8px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.07)}'+
+    '.pn h3{font-size:12px;font-weight:700;color:#334155;margin-bottom:8px}'+
+    'table.mt{width:100%;border-collapse:collapse;font-size:11px}'+
+    'table.mt th{background:#f1f5f9;padding:6px 8px;text-align:center;font-weight:700;font-size:10px;border:1px solid #e2e8f0;white-space:nowrap}'+
+    'table.mt th.bl{text-align:left}'+
+    'table.mt td{padding:6px 8px;text-align:center;border:1px solid #e2e8f0;font-weight:600;cursor:pointer}'+
+    'table.mt td.bn{text-align:left;font-weight:600;color:#334155;white-space:nowrap}'+
+    'table.mt tr:hover td{filter:brightness(.96)}'+
+    'table.mt tr.ar td{background:#eff6ff!important}'+
+    '.cm{color:#92400e;background:#fffbeb}.cr_{color:#1e3a8a;background:#eff6ff}.cd{color:#14532d;background:#f0fdf4}.cz{color:#cbd5e1}'+
+    '.cw{position:relative;height:200px}'+
+    '.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin-top:8px}'+
+    '.vc{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:11px 13px;font-size:11px}'+
+    '.vc .tp{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;gap:6px;flex-wrap:wrap}'+
+    '.vc .co{font-weight:700;font-size:12px;color:#0f172a}'+
+    '.vc .br_{font-size:10px;color:#94a3b8;margin-left:4px}'+
+    '.bdg{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap}'+
+    '.bm{background:#d97706}.br2{background:#2563eb}.bd{background:#16a34a}'+
+    '.vc .mt2{color:#64748b;margin-bottom:5px;line-height:1.7;font-size:10px}'+
+    '.vc .zi{color:#0891b2;margin-bottom:5px;font-size:10px}'+
+    '.vc .ct{background:#f8fafc;border-radius:6px;padding:6px 8px;color:#334155;line-height:1.6;white-space:pre-wrap;font-size:10px}'+
+    '.nd{text-align:center;padding:30px;color:#94a3b8;font-size:12px}'+
+    '@media(max-width:700px){.pp{grid-template-columns:1fr}.fb{top:50px}.fg{min-width:calc(50% - 4px)}.cards{grid-template-columns:1fr}.sc .n{font-size:18px}}'+
+    '@media(max-width:400px){.fg{min-width:100%}}';
+
+  const bodyHtml=
+    '<div class="hdr"><h1>'+safeTitle+'</h1>'+
+    '<div class="sub">강북/강원사업지원팀 · KT Security &nbsp;|&nbsp; 기준일 '+today+' &nbsp;|&nbsp; 총 '+d.length+'건</div></div>'+
+    '<div class="fb">'+
+      '<div class="fg"><label>관리지사</label><select id="f_br" onchange="onBr()"><option value="">전체 지사</option></select></div>'+
+      '<div class="fg"><label>영업구역</label><select id="f_zone" onchange="onZone()"><option value="">전체 구역</option></select></div>'+
+      '<div class="fg"><label>담당자</label><select id="f_hdl" onchange="render()"><option value="">전체 담당자</option></select></div>'+
+      '<div class="fg" style="min-width:180px;flex:2"><label>상태 (다중선택)</label><div class="stg">'+
+        '<button class="sb on" data-st="미접수" onclick="togSt(this)">미접수</button>'+
+        '<button class="sb on" data-st="접수" onclick="togSt(this)">접수</button>'+
+        '<button class="sb on" data-st="처리완료" onclick="togSt(this)">처리완료</button>'+
+      '</div></div>'+
+    '</div>'+
+    '<div class="wrap">'+
+      '<div class="sr" id="sr"></div>'+
+      '<div class="pp">'+
+        '<div class="pn"><h3>지사별 현황 (행 클릭 → 지사 필터)</h3><table class="mt" id="mtx"></table></div>'+
+        '<div class="pn"><h3>지사별 누적 현황</h3><div class="cw"><canvas id="ch"></canvas></div></div>'+
+      '</div>'+
+      '<div class="pn" style="margin-bottom:12px"><h3>VOC 목록 <span id="cnt" style="font-weight:400;color:#94a3b8;font-size:11px"></span></h3>'+
+        '<div class="cards" id="cards"></div>'+
+      '</div>'+
+    '</div>';
+
+  const jsCode=
+    'var DATA='+safeData+';'+
+    'var BR_ORDER='+safeBrOrder+';'+
+    'var STC={"미접수":"rgba(217,119,6,.8)","접수":"rgba(37,99,235,.8)","처리완료":"rgba(22,163,74,.8)"};'+
+    'var STCLS={"미접수":"cm","접수":"cr_","처리완료":"cd"};'+
+    'var BCLS={"미접수":"bm","접수":"br2","처리완료":"bd"};'+
+    'var chi=null;'+
+    'function ge(id){return document.getElementById(id)}'+
+    'function gv(id){return ge(id).value}'+
+    'function xe(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}'+
+    'function gSts(){return[...document.querySelectorAll(".sb.on")].map(b=>b.dataset.st)}'+
+    'function gZones(br){return[...new Set(DATA.filter(r=>!br||r.br===br).map(r=>r.zone).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ko"))}'+
+    'function gHdls(br,z){return[...new Set(DATA.filter(r=>(!br||r.br===br)&&(!z||r.zone===z)).map(r=>r.handler).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ko"))}'+
+    'function popSel(id,items,ph){var s=ge(id),c=s.value;s.innerHTML="<option value=\'\'>" +ph+"</option>"+items.map(v=>"<option value=\'"+xe(v)+"\'>"+xe(v)+"</option>").join("");if(items.includes(c))s.value=c}'+
+    'function onBr(){var br=gv("f_br");popSel("f_zone",gZones(br),"전체 구역");popSel("f_hdl",gHdls(br,""),"전체 담당자");render()}'+
+    'function onZone(){var br=gv("f_br"),z=gv("f_zone");popSel("f_hdl",gHdls(br,z),"전체 담당자");render()}'+
+    'function togSt(b){b.classList.toggle("on");render()}'+
+    'function getFilt(){var br=gv("f_br"),z=gv("f_zone"),h=gv("f_hdl"),sts=gSts();'+
+    'return DATA.filter(r=>(!br||r.br===br)&&(!z||r.zone===z)&&(!h||r.handler===h)&&(!sts.length||sts.includes(r.st)))}'+
+    'function rStats(rows){var c={"미접수":0,"접수":0,"처리완료":0};rows.forEach(r=>{if(c[r.st]!==undefined)c[r.st]++});'+
+    'ge("sr").innerHTML='+
+    '"<div class=\'sc t\'><div class=\'n\'>"+rows.length+"</div><div class=\'lb\'>전체</div></div>"+'+
+    '"<div class=\'sc m\'><div class=\'n\' style=\'color:#d97706\'>"+c["미접수"]+"</div><div class=\'lb\'>미접수</div></div>"+'+
+    '"<div class=\'sc r\'><div class=\'n\' style=\'color:#2563eb\'>"+c["접수"]+"</div><div class=\'lb\'>접수</div></div>"+'+
+    '"<div class=\'sc d\'><div class=\'n\' style=\'color:#16a34a\'>"+c["처리완료"]+"</div><div class=\'lb\'>처리완료</div></div>"}'+
+    'function fBr(br){var s=ge("f_br");s.value=(s.value===br)?"":br;onBr()}'+
+    'function rMatrix(rows){'+
+    'var sts=["미접수","접수","처리완료"];'+
+    'var mat={};BR_ORDER.forEach(br=>{mat[br]={"미접수":0,"접수":0,"처리완료":0,t:0}});'+
+    'rows.forEach(r=>{if(!mat[r.br])mat[r.br]={"미접수":0,"접수":0,"처리완료":0,t:0};if(mat[r.br][r.st]!==undefined)mat[r.br][r.st]++;mat[r.br].t++});'+
+    'var abr=gv("f_br");'+
+    'var h="<tr><th class=\'bl\'>지사</th><th>미접수</th><th>접수</th><th>처리완료</th><th>합계</th></tr>";'+
+    'BR_ORDER.forEach(br=>{'+
+    'var m=mat[br]||{"미접수":0,"접수":0,"처리완료":0,t:0};var ac=abr===br;'+
+    'h+="<tr"+(ac?" class=\'ar\'":"")+" onclick=\'fBr(\\\""+br+"\\\")\' style=\'transition:.1s\'>";'+
+    'h+="<td class=\'bn\'>"+xe(br)+"</td>";'+
+    'sts.forEach(s=>{var v=m[s]||0;h+="<td class=\'"+(v?STCLS[s]:"cz")+"\'>"+(v||"-")+"</td>"});'+
+    'h+="<td style=\'font-weight:700;color:#475569\'>"+(m.t||0)+"</td></tr>"});'+
+    'ge("mtx").innerHTML=h}'+
+    'function rChart(rows){'+
+    'var labels=BR_ORDER.map(b=>b.replace("지사",""));'+
+    'var ds=["미접수","접수","처리완료"].map(s=>({label:s,data:BR_ORDER.map(br=>rows.filter(r=>r.br===br&&r.st===s).length),backgroundColor:STC[s],borderRadius:3}));'+
+    'var ctx=ge("ch").getContext("2d");'+
+    'if(chi)chi.destroy();'+
+    'chi=new Chart(ctx,{type:"bar",data:{labels:labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,'+
+    'plugins:{legend:{position:"top",labels:{font:{size:10},boxWidth:10}}},'+
+    'scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,ticks:{precision:0,font:{size:9}}}}}})}'+
+    'function rCards(rows){'+
+    'ge("cnt").textContent="("+rows.length+"건)";'+
+    'if(!rows.length){ge("cards").innerHTML="<div class=\'nd\'>조건에 맞는 VOC가 없습니다</div>";return}'+
+    'var s=[...rows].sort((a,b)=>(b.dt||"").localeCompare(a.dt||""));'+
+    'ge("cards").innerHTML=s.map(r=>{var bc=BCLS[r.st]||"";'+
+    'return "<div class=\'vc\'>"'+
+    '+"<div class=\'tp\'><div><span class=\'co\'>"+xe(r.co)+"</span><span class=\'br_\'>"+xe(r.br)+"</span></div>"'+
+    '+"<span class=\'bdg "+bc+"\'>"+xe(r.st)+"</span></div>"'+
+    '+"<div class=\'mt2\'>📅 "+xe(r.dt)+(r.vt?" &nbsp;|&nbsp; 🏷 "+xe(r.vt)+(r.vm?" / "+xe(r.vm):""):"")+(r.svc?" &nbsp;|&nbsp; 🔑 "+xe(r.svc):"")+"</div>"'+
+    '+(r.zone||r.handler!="미배정"?"<div class=\'zi\'>📍 "+xe(r.zone)+(r.handler&&r.handler!="미배정"?" · 담당 "+xe(r.handler):"")+"</div>":"")'+
+    '+"<div class=\'ct\'>"+xe(r.body)+(r.body.length>=200?"…":"")+"</div></div>"'+
+    '}).join("")}'+
+    'function render(){var rows=getFilt();rStats(rows);rMatrix(rows);rChart(rows);rCards(rows)}'+
+    '(function(){'+
+    'var brs=[...new Set(DATA.map(r=>r.br))];'+
+    'var sorted=BR_ORDER.filter(b=>brs.includes(b)).concat(brs.filter(b=>!BR_ORDER.includes(b)).sort((a,b)=>a.localeCompare(b,"ko")));'+
+    'popSel("f_br",sorted,"전체 지사");'+
+    'popSel("f_zone",gZones(""),"전체 구역");'+
+    'popSel("f_hdl",gHdls("",""),"전체 담당자");'+
+    'render()})();';
+
+  const scriptCDN='<'+'script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><'+'/script>';
+  const scriptBody='<'+'script>'+jsCode+'<'+'/script>';
+
+  const html=
+    '<!DOCTYPE html><html lang="ko"><head>'+
+    '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>'+safeTitle+'</title>'+
+    scriptCDN+
+    '<style>'+css+'</style>'+
+    '</head><body>'+
+    bodyHtml+
+    scriptBody+
+    '</body></html>';
 
   return {html};
 }
 
-// 더 이상 후처리 불필요(첫 그룹 open 속성으로 직접 처리). 호환을 위해 함수는 유지.
 function finalizeShareHtml(doc){ return doc.html; }
 
 function downloadShareHtml(){
   const status = document.getElementById('shareExportStatus');
   try{
-    const doc = buildShareHtmlDoc();
-    const finalHtml = finalizeShareHtml(doc);
-    const fullDoc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>VOC 조회</title></head><body>' + finalHtml + '</body></html>';
-    const blob = new Blob([fullDoc], {type:'text/html;charset=utf-8'});
+    const {html} = buildShareHtmlDoc();
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -4965,14 +5117,11 @@ function downloadShareHtml(){
 function copyShareHtmlToClipboard(){
   const status = document.getElementById('shareExportStatus');
   try{
-    const doc = buildShareHtmlDoc();
-    const finalHtml = finalizeShareHtml(doc);
-
+    const {html} = buildShareHtmlDoc();
     const doCopy = (text) => {
       if(navigator.clipboard && navigator.clipboard.writeText){
         return navigator.clipboard.writeText(text);
       }
-      // 폴백: 임시 textarea
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position='fixed'; ta.style.left='-9999px';
@@ -4982,8 +5131,7 @@ function copyShareHtmlToClipboard(){
       document.body.removeChild(ta);
       return Promise.resolve();
     };
-
-    doCopy(finalHtml).then(()=>{
+    doCopy(html).then(()=>{
       status.textContent = '✅ HTML 소스가 클립보드에 복사되었습니다. 메일 편집기의 HTML/소스보기 모드에서 붙여넣으세요.';
     }).catch(err=>{
       console.error(err);
