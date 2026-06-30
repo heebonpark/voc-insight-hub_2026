@@ -1308,15 +1308,22 @@ function buildSels(){
   sel.innerHTML='<option value="">전체</option>'+vt.map(v=>`<option>${v}</option>`).join('');
   sel.value=cur;
 
-  const hd=[...new Set(ALL.map(r=>r['처리자']).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
-  const hsel=document.getElementById('f_handler'),hcur=hsel.value;
-  hsel.innerHTML='<option value="">전체</option>'+hd.map(v=>`<option>${v}</option>`).join('');
-  hsel.value=hcur;
+  refreshHandlerOptions();
 
   const tm=[...new Set(ALL.map(r=>r['VOC유형중']).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
   const tmsel=document.getElementById('f_typeMid'),tmcur=tmsel.value;
   tmsel.innerHTML='<option value="">전체</option>'+tm.map(v=>`<option>${v}</option>`).join('');
   tmsel.value=tmcur;
+}
+
+// 관리지사 선택값에 따라 처리자 옵션을 동적으로 좁힘 (캐스케이딩) — 선택된 처리자가 새 목록에 없으면 전체로 리셋
+function refreshHandlerOptions(){
+  const br=effFilter('f_br');
+  const src=br?ALL.filter(r=>condMatch(br,r['관리지사'])):ALL;
+  const hd=[...new Set(src.map(r=>effHandler(r)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const hsel=document.getElementById('f_handler'),hcur=hsel.value;
+  hsel.innerHTML='<option value="">전체</option>'+hd.map(v=>`<option>${v}</option>`).join('');
+  hsel.value=hd.includes(hcur)?hcur:'';
 }
 
 // ══ 영업담당자매칭 LOAD — 영업구역번호(구역번호) → 실제 구역담당자명 ══
@@ -1707,7 +1714,7 @@ function af(){
     if(MF==='memoOpen'&&!getMemosFor(vocKey(r)).some(m=>!m.done))return false;
     if(!condMatch(st, r['상태']))return false;
     if(!condMatch(dt, r['담당유형']))return false;
-    if(!condMatch(hd, r['처리자']))return false;
+    if(!condMatch(hd, effHandler(r)))return false;
     if(!condMatch(vt, r['VOC유형대']))return false;
     if(!condMatch(tm, r['VOC유형중']))return false;
     if(!condMatch(br, r['관리지사']))return false;
@@ -1737,11 +1744,12 @@ function mlblText(n){
   };
   return map[MF] || '';
 }
-function rf(){presetOverride={};['f_st','f_dt','f_handler','f_vt','f_typeMid','f_br','f_png','f_cs','f_dateFrom','f_dateTo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
+function rf(){presetOverride={};['f_st','f_dt','f_handler','f_vt','f_typeMid','f_br','f_png','f_cs','f_dateFrom','f_dateTo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f_kw').value='';MF='all';refreshHandlerOptions();document.querySelectorAll('.mb').forEach((b,i)=>{b.classList.toggle('on',i===0);});af();renderPresetBtns();}
 
 // 사용자가 드롭다운을 직접 바꾸면 해당 필드의 다중값 오버라이드는 해제 (사용자 의도 우선)
 function onFilterChange(id){
   if(presetOverride[id]) delete presetOverride[id];
+  if(id==='f_br') refreshHandlerOptions();
   af();
 }
 
@@ -1807,7 +1815,7 @@ function applyPreset(idx){
   const p = presets[idx];
   if(!p) return;
   presetOverride = {}; // 이전 오버라이드 초기화
-  PRESET_FIELDS.forEach(id=>{
+  const setField = (id) => {
     const v = p.cond[id];
     if(Array.isArray(v) && v.length >= 2){
       // 다중값 OR — 드롭다운은 비우고 오버라이드에 저장
@@ -1818,7 +1826,11 @@ function applyPreset(idx){
     } else {
       document.getElementById(id).value = v || '';
     }
-  });
+  };
+  // 관리지사를 먼저 적용해 처리자 옵션을 좁힌 뒤 나머지 필드(처리자 포함) 적용
+  setField('f_br');
+  refreshHandlerOptions();
+  PRESET_FIELDS.filter(id=>id!=='f_br').forEach(setField);
   document.getElementById('f_kw').value = p.cond.f_kw || '';
   MF = p.cond.mf || 'all';
   document.querySelectorAll('.mb').forEach(b=>{
@@ -2102,6 +2114,7 @@ function ct(k){
   const id = m[k];
   document.getElementById(id).value='';
   if(presetOverride[id]) delete presetOverride[id];   // 다중값 오버라이드도 함께 해제
+  if(id==='f_br') refreshHandlerOptions();
   af();
 }
 
@@ -2206,6 +2219,8 @@ const BS_STATES=['미접수','접수','처리중','처리완료','결재요청']
 const BS_STATE_COLORS={'미접수':'#dc2626','접수':'#d97706','처리중':'#7c3aed','처리완료':'#16a34a','결재요청':'#0891b2','미분류':'#64748b'};
 function bsState(r){const s=r['상태'];return BS_STATES.includes(s)?s:'미분류';}
 function bsMgrOf(r){return r._zoneName||r._mgr||'';}
+// 처리자가 비어있으면 담당자(영업담당자매칭)를 기본 처리자로 사용 — 대시보드/필터링 전반에 적용
+function effHandler(r){return r['처리자']||bsMgrOf(r)||'';}
 function bsPalette(n){const out=[];for(let i=0;i<n;i++)out.push(CLR[i%CLR.length]);return out;}
 
 function buildBsSelects(){
@@ -2229,7 +2244,7 @@ function updateBsZoneSelect(){
 function updateBsHandlerSelect(){
   const br=document.getElementById('bs_br').value,zn=document.getElementById('bs_zone').value;
   const pool=ALL.filter(r=>(!br||bsNorm(r['관리지사'])===br)&&(!zn||bsNorm(r._bizZone)===zn));
-  const handlers=[...new Set(pool.map(r=>bsNorm(r['처리자'])))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const handlers=[...new Set(pool.map(r=>bsNorm(effHandler(r))))].sort((a,b)=>a.localeCompare(b,'ko'));
   const sel=document.getElementById('bs_handler'),cur=sel.value;
   sel.innerHTML='<option value="">전체</option>'+handlers.map(h=>`<option value="${h}">${h}</option>`).join('');
   sel.value=handlers.includes(cur)?cur:'';
@@ -2253,7 +2268,7 @@ function bsFiltered(){
   return ALL.filter(r=>
     (!br||bsNorm(r['관리지사'])===br) &&
     (!zn||bsNorm(r._bizZone)===zn) &&
-    (!hd||bsNorm(r['처리자'])===hd) &&
+    (!hd||bsNorm(effHandler(r))===hd) &&
     (!mg||bsNorm(bsMgrOf(r))===mg) &&
     (!st||r['상태']===st) &&
     (!df||(r['접수일시']||'')>=df) &&
@@ -2440,12 +2455,12 @@ function renderMgrSection(){
           <td style="padding:6px 8px;text-align:center;color:var(--tel)">${s['결재요청']}</td>`;
 
   // ── 처리자별 현황 (실제 VOC를 처리한 사람 — 로스터 없이 실데이터 기준) ──
-  const handlerNames=[...new Set(pool.map(r=>bsNorm(r['처리자'])))].sort((a,b)=>{
+  const handlerNames=[...new Set(pool.map(r=>bsNorm(effHandler(r))))].sort((a,b)=>{
     if(a==='(미지정)') return 1; if(b==='(미지정)') return -1;
     return a.localeCompare(b,'ko');
   });
   const handlerStats=handlerNames.map(h=>{
-    const rows=pool.filter(r=>bsNorm(r['처리자'])===h);
+    const rows=pool.filter(r=>bsNorm(effHandler(r))===h);
     const cnt={'미접수':0,'접수':0,'처리중':0,'처리완료':0,'결재요청':0,'미분류':0};
     rows.forEach(r=>cnt[bsState(r)]++);
     return {h,rows,total:rows.length,...cnt};
@@ -2660,7 +2675,7 @@ function closeMgrDetail(){ document.getElementById('mgrDetailOv').classList.remo
 function openHandlerDetail(handlerName, br){
   br = br || document.getElementById('bs_br').value;
   const scope = bsFiltered();
-  const rows = scope.filter(r=>bsNorm(r['처리자'])===handlerName);
+  const rows = scope.filter(r=>bsNorm(effHandler(r))===handlerName);
   MGR_DETAIL_VOCS = rows;
   const total = rows.length;
   const sample = rows[0]||{};
@@ -3505,6 +3520,7 @@ function renderTypeHeatmap(){
 function geoFilterToType(branch, typeMid){
   showPg('list', document.querySelectorAll('.nv')[1]);
   document.getElementById('f_br').value = branch;
+  refreshHandlerOptions();
   document.getElementById('f_typeMid').value = typeMid || '';
   af();
 }
@@ -3573,6 +3589,7 @@ function renderHeatmap(){
 function geoFilterTo(branch, zone){
   showPg('list', document.querySelectorAll('.nv')[1]);
   document.getElementById('f_br').value = branch;
+  refreshHandlerOptions();
   document.getElementById('f_kw').value = zone || '';
   af();
 }
